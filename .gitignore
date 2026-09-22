@@ -29,9 +29,7 @@ yarn-error.log*
 
 
 # Local SQLite Database & Storage
-prisma/*.db
 prisma/*.db-journal
-prisma/dev.db
 prisma/dev.db-journal
 
 # OS & System Files

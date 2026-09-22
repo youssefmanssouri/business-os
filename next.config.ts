@@ -16,6 +16,14 @@ const cspHeader = `
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  outputFileTracingIncludes: {
+    "/**": ["./prisma/dev.db"],
+  },
+  env: {
+    SESSION_SECRET:
+      process.env.SESSION_SECRET ||
+      "businessos_production_default_session_secret_2026_vault_key_99x!",
+  },
   images: {
     remotePatterns: [
       {
