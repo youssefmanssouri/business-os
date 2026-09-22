@@ -35,3 +35,10 @@ export function truncateText(str: string, maxLength: number = 50): string {
   if (str.length <= maxLength) return str;
   return str.slice(0, maxLength) + "...";
 }
+
+/**
+ * Deterministically rounds financial numbers to two decimal places
+ */
+export function roundMoney(val: number): number {
+  return Math.round((val + Number.EPSILON) * 100) / 100;
+}

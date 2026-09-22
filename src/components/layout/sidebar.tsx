@@ -31,7 +31,7 @@ interface SidebarProps {
 const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "CRM & Leads", href: "/crm", icon: Users },
-  { label: "Invoices", href: "/invoices", icon: FileText, badge: "3" },
+  { label: "Invoices", href: "/invoices", icon: FileText },
   { label: "Bookings", href: "/bookings", icon: Calendar },
   { label: "Employees", href: "/employees", icon: UserCheck },
   { label: "Tasks", href: "/tasks", icon: CheckSquare, badge: "5" },

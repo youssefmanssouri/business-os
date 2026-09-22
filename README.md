@@ -1,4 +1,4 @@
-﻿# BusinessOS — SaaS Business Operations Platform
+# BusinessOS — SaaS Business Operations Platform
 
 > **Full-Stack SaaS Business Operations Platform** combining CRM, itemized invoicing, appointment bookings, HR directory, and financial telemetry into a unified workspace.
 >
@@ -7,7 +7,7 @@
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-3A171C?style=flat-square&logo=vercel)](https://business-os-manssouri.vercel.app)
 [![Case Study](https://img.shields.io/badge/Portfolio-Case%20Study-A65F4B?style=flat-square)](https://www.youssefmanssouri.site/projects/businessos)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15%20App%20Router-black?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Prisma ORM](https://img.shields.io/badge/Prisma-ORM-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
 
 ---
@@ -87,33 +87,41 @@ Browser Client (React 19 / Tailwind CSS)
 
 ### 1. Clone & Install
 
-`ash
+```bash
 git clone https://github.com/youssefmanssouri/business-os.git
 cd business-os
 npm install
-`
+```
 
 ### 2. Configure Environment
 
 Create a .env file based on .env.example:
 
-`env
+```env
 DATABASE_URL="file:./dev.db"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-`
+SESSION_SECRET="your-development-session-secret-key-at-least-32-chars"
+NODE_ENV="development"
+NEXT_PUBLIC_DEMO_MODE="false"
+```
+
+> **Note on Environment Variables:**
+> - `DATABASE_URL`: Connection string for SQLite (`file:./dev.db`) or PostgreSQL.
+> - `SESSION_SECRET`: Signing secret for JWT sessions (minimum 32 characters; strictly required and validated in production).
+> - `NODE_ENV`: Set to `production` in live environments to enforce HTTPS secure cookies and strict secret checks.
+> - `NEXT_PUBLIC_DEMO_MODE`: Optional UI flag (set to `"true"` only if displaying the demo indicator badge; does not alter server-side authorization).
 
 ### 3. Initialize Database & Seed Synthetic Data
 
-`ash
+```bash
 npx prisma db push
 npm run db:seed
-`
+```
 
 ### 4. Run Development Server
 
-`ash
+```bash
 npm run dev
-`
+```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 

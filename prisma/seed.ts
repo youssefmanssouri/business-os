@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -52,12 +53,18 @@ async function main() {
     },
   });
 
-  // 3. Create Users / Employees
+  // 3. Create Users / Employees with secure password hashes
+  const adminPasswordHash = await bcrypt.hash("AcmeAdmin2026!", 10);
+  const managerPasswordHash = await bcrypt.hash("AcmeManager2026!", 10);
+  const staffPasswordHash = await bcrypt.hash("AcmeStaff2026!", 10);
+  const apexManagerHash = await bcrypt.hash("ApexManager2026!", 10);
+
   const userYoussef = await prisma.user.create({
     data: {
       id: "usr_youssef",
       companyId: acme.id,
       email: "youssef@acmecloud.com",
+      passwordHash: adminPasswordHash,
       name: "Youssef Manssouri",
       role: "ADMIN",
       title: "Founder & Chief Executive",
@@ -71,6 +78,7 @@ async function main() {
       id: "usr_sarah",
       companyId: acme.id,
       email: "sarah.j@acmecloud.com",
+      passwordHash: managerPasswordHash,
       name: "Sarah Jenkins",
       role: "MANAGER",
       title: "VP of Business Development",
@@ -84,6 +92,7 @@ async function main() {
       id: "usr_alex",
       companyId: acme.id,
       email: "alex.chen@acmecloud.com",
+      passwordHash: staffPasswordHash,
       name: "Alex Chen",
       role: "EMPLOYEE",
       title: "Lead Platform Engineer",
@@ -97,6 +106,7 @@ async function main() {
       id: "usr_marcus",
       companyId: acme.id,
       email: "marcus.v@acmecloud.com",
+      passwordHash: staffPasswordHash,
       name: "Marcus Vance",
       role: "EMPLOYEE",
       title: "Senior Financial Analyst",
@@ -104,6 +114,21 @@ async function main() {
       avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80",
     },
   });
+
+  // Secondary tenant user for tenant isolation testing
+  await prisma.user.create({
+    data: {
+      id: "usr_elena",
+      companyId: apex.id,
+      email: "elena.rostova@apexdynamics.com",
+      passwordHash: apexManagerHash,
+      name: "Elena Rostova",
+      role: "MANAGER",
+      title: "VP of Portfolio Strategy",
+      department: "Wealth Management",
+    },
+  });
+
 
   // 4. Create Customers
   const custVercel = await prisma.customer.create({

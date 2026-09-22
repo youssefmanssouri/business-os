@@ -1,6 +1,6 @@
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -18,6 +18,11 @@ model Company {
   timezone       String          @default("America/New_York")
   plan           String          @default("PRO") // PRO, ENTERPRISE, STARTER
   subscriptionId String?
+  address        String?
+  phone          String?
+  email          String?
+  taxId          String?
+  registrationId String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -42,6 +47,7 @@ model User {
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   email        String        @unique
   name         String
+  passwordHash String?
   role         String        @default("ADMIN") // ADMIN, MANAGER, EMPLOYEE
   avatar       String?
   department   String?       @default("General Management")
@@ -54,25 +60,31 @@ model User {
   assignedTasks Task[]       @relation("TaskAssignee")
   appointments  Appointment[] @relation("StaffAppointment")
   documents     Document[]
+
+  @@index([companyId])
 }
 
 model Customer {
-  id           String        @id @default(uuid())
-  companyId    String
-  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  name         String
-  email        String
-  phone        String?
-  companyName  String?
-  status       String        @default("CUSTOMER") // LEAD, PROSPECT, CUSTOMER, CHURNED
-  totalSpent   Float         @default(0.0)
-  lastContact  DateTime?     @default(now())
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id             String        @id @default(uuid())
+  companyId      String
+  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name           String
+  email          String
+  phone          String?
+  companyName    String?
+  status         String        @default("CUSTOMER") // LEAD, PROSPECT, CUSTOMER, CHURNED
+  totalSpent     Float         @default(0.0)
+  billingAddress String?
+  taxId          String?
+  lastContact    DateTime?     @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   deals        Deal[]
   invoices     Invoice[]
   appointments Appointment[]
+
+  @@index([companyId])
 }
 
 model Deal {
@@ -88,27 +100,55 @@ model Deal {
   expectedClose DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([customerId])
 }
 
 model Invoice {
-  id             String        @id @default(uuid())
-  companyId      String
-  company        Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customerId     String
-  customer       Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  invoiceNumber  String        @unique
-  status         String        @default("PENDING") // PAID, PENDING, OVERDUE, DRAFT
-  issueDate      DateTime      @default(now())
-  dueDate        DateTime
-  subtotal       Float
-  taxAmount      Float
-  discountAmount Float         @default(0.0)
-  totalAmount    Float
-  notes          String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                      String        @id @default(uuid())
+  companyId               String
+  company                 Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerId              String
+  customer                Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoiceNumber           String
+  status                  String        @default("PENDING") // PAID, PENDING, OVERDUE, DRAFT
+  issueDate               DateTime      @default(now())
+  dueDate                 DateTime
+  subtotal                Float
+  taxAmount               Float
+  discountAmount          Float         @default(0.0)
+  totalAmount             Float
+  notes                   String?
+
+  // Financial snapshots
+  currency                String?
+  taxRate                 Float?
+  paidAt                  DateTime?
+
+  // Customer snapshots
+  customerNameSnapshot    String?
+  customerEmailSnapshot   String?
+  customerCompanySnapshot String?
+  customerAddressSnapshot String?
+  customerTaxIdSnapshot   String?
+
+  // Seller/company snapshots
+  sellerNameSnapshot           String?
+  sellerAddressSnapshot        String?
+  sellerPhoneSnapshot          String?
+  sellerEmailSnapshot          String?
+  sellerTaxIdSnapshot          String?
+  sellerRegistrationIdSnapshot String?
+
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
 
   items          InvoiceItem[]
+
+  @@unique([companyId, invoiceNumber])
+  @@index([companyId])
+  @@index([customerId])
 }
 
 model InvoiceItem {
@@ -119,6 +159,8 @@ model InvoiceItem {
   quantity    Int
   unitPrice   Float
   amount      Float
+
+  @@index([invoiceId])
 }
 
 model Service {
@@ -134,6 +176,8 @@ model Service {
   createdAt       DateTime      @default(now())
 
   appointments    Appointment[]
+
+  @@index([companyId])
 }
 
 model Appointment {
@@ -141,9 +185,9 @@ model Appointment {
   companyId  String
   company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customerId String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
   serviceId  String
-  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
   staffId    String?
   staff      User?    @relation("StaffAppointment", fields: [staffId], references: [id], onDelete: SetNull)
   startTime  DateTime
@@ -151,6 +195,13 @@ model Appointment {
   status     String   @default("CONFIRMED") // CONFIRMED, COMPLETED, CANCELLED
   notes      String?
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([serviceId])
+  @@index([staffId])
+  @@index([companyId, startTime])
 }
 
 model Task {
@@ -167,6 +218,9 @@ model Task {
   tags        String?  @default("Core")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([assigneeId])
 }
 
 model Product {
@@ -184,6 +238,9 @@ model Product {
   barcode       String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@unique([companyId, sku])
+  @@index([companyId])
 }
 
 model FinanceRecord {
@@ -197,6 +254,8 @@ model FinanceRecord {
   description String
   status      String   @default("SETTLED") // SETTLED, PENDING
   createdAt   DateTime @default(now())
+
+  @@index([companyId])
 }
 
 model Document {
@@ -212,6 +271,8 @@ model Document {
   uploadedById String?
   uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
+
+  @@index([companyId])
 }
 
 model ActivityLog {
@@ -221,8 +282,10 @@ model ActivityLog {
   action      String   // INVOICE_CREATED, DEAL_WON, TASK_COMPLETED, APPOINTMENT_BOOKED
   category    String   @default("SYSTEM")
   description String
-  actorName   String   @default("Youssef Manssouri")
+  actorName   String   @default("System User")
   createdAt   DateTime @default(now())
+
+  @@index([companyId])
 }
 
 model Notification {
@@ -235,6 +298,8 @@ model Notification {
   type      String   @default("INFO") // INFO, SUCCESS, WARNING, ALERT
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([companyId])
 }
 
 model AISetting {

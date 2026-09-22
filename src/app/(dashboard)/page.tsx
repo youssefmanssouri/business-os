@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatAppointmentTime } from "@/lib/timezone";
 import { getDashboardMetrics } from "@/lib/actions";
 import {
   DollarSign,
@@ -14,12 +15,9 @@ import {
   Users,
   AlertCircle,
   TrendingUp,
-  ArrowUpRight,
-  Plus,
   Activity,
-  FileText,
-  CheckCircle2,
   Clock,
+  ShieldCheck,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -33,13 +31,26 @@ import {
 export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadData() {
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
       const res = await getDashboardMetrics();
-      setData(res);
+      if (res.success) {
+        setData(res);
+      } else {
+        setError(res.error || "Unable to load business telemetry.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Failed to load dashboard metrics.");
+    } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -57,16 +68,44 @@ export default function DashboardPage() {
     );
   }
 
+  if (error || !data) {
+    return (
+      <div className="space-y-4 p-8 text-center rounded-2xl border border-rose-200 bg-rose-50/50 dark:border-rose-900/50 dark:bg-rose-950/20">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 mx-auto">
+          <AlertCircle className="h-5 w-5" />
+        </div>
+        <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+          Telemetry Service Unavailable
+        </h2>
+        <p className="text-xs text-neutral-500 max-w-md mx-auto">
+          {error || "An error occurred while loading telemetry data. No fallback data is shown to protect integrity."}
+        </p>
+        <Button onClick={loadData} size="sm" variant="outline" className="mt-2">
+          Retry Connection
+        </Button>
+      </div>
+    );
+  }
+
+  const currency = data.company?.currency || "USD";
+  const timezone = data.company?.timezone || "America/New_York";
+
   return (
     <div className="space-y-6">
       {/* Top Header Banner */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-neutral-200/60 pb-5 dark:border-neutral-800/60">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-            Executive Command Center
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
+              Executive Command Center
+            </h1>
+            <Badge variant="outline" className="text-[10px]">
+              {data.company?.name || "Organization"}
+            </Badge>
+          </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-            Real-time business telemetry across revenue, bookings, CRM, and cash flow.
+            Authoritative business telemetry across revenue, bookings, CRM, and cash flow in{" "}
+            <span className="font-semibold text-neutral-700 dark:text-neutral-300">{timezone}</span> ({currency}).
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -92,14 +131,13 @@ export default function DashboardPage() {
             </div>
             <div className="mt-3 flex items-baseline justify-between">
               <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-                {formatCurrency(data.totalRevenue)}
+                {formatCurrency(data.totalRevenue, currency)}
               </span>
-              <span className="flex items-center text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                <ArrowUpRight className="h-3.5 w-3.5" />
-                +18.4%
-              </span>
+              <Badge variant="success" className="text-[10px]">
+                {data.paidInvoicesCount || 0} Paid
+              </Badge>
             </div>
-            <p className="mt-1 text-[11px] text-neutral-400">vs. $107,600 last month</p>
+            <p className="mt-1 text-[11px] text-neutral-400">All-time collected revenue</p>
           </CardContent>
         </Card>
 
@@ -116,13 +154,15 @@ export default function DashboardPage() {
             </div>
             <div className="mt-3 flex items-baseline justify-between">
               <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-                {formatCurrency(data.pendingInvoicesAmount)}
+                {formatCurrency(data.pendingInvoicesAmount, currency)}
               </span>
               <Badge variant="warning" className="text-[10px]">
-                3 Invoices
+                {data.pendingInvoicesCount || 0} Pending
               </Badge>
             </div>
-            <p className="mt-1 text-[11px] text-neutral-400">1 Overdue payment notice</p>
+            <p className="mt-1 text-[11px] text-neutral-400">
+              {data.overdueInvoicesCount || 0} Overdue payment{data.overdueInvoicesCount === 1 ? "" : "s"}
+            </p>
           </CardContent>
         </Card>
 
@@ -139,13 +179,17 @@ export default function DashboardPage() {
             </div>
             <div className="mt-3 flex items-baseline justify-between">
               <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-                {data.totalAppointments} Sessions
+                {data.totalAppointments} Total
               </span>
               <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                Next: 2:00 PM
+                {data.upcomingAppointments && data.upcomingAppointments.length > 0
+                  ? `Next: ${formatAppointmentTime(data.upcomingAppointments[0].startTime, timezone, "hh:mm a")}`
+                  : "Next: None"}
               </span>
             </div>
-            <p className="mt-1 text-[11px] text-neutral-400">4 Confirmed this week</p>
+            <p className="mt-1 text-[11px] text-neutral-400">
+              {data.upcomingAppointments?.length || 0} Confirmed upcoming
+            </p>
           </CardContent>
         </Card>
 
@@ -154,7 +198,7 @@ export default function DashboardPage() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
-                Active Customers
+                Client Accounts
               </span>
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400">
                 <Users className="h-4 w-4" />
@@ -165,11 +209,11 @@ export default function DashboardPage() {
                 {data.totalCustomers} Accounts
               </span>
               <span className="flex items-center text-xs font-semibold text-purple-600 dark:text-purple-400">
-                <TrendingUp className="h-3.5 w-3.5" />
-                +4 New
+                <TrendingUp className="h-3.5 w-3.5 mr-1" />
+                {data.activeCustomersCount ?? data.totalCustomers} Active
               </span>
             </div>
-            <p className="mt-1 text-[11px] text-neutral-400">100% Retained MRR</p>
+            <p className="mt-1 text-[11px] text-neutral-400">Verified tenant customer base</p>
           </CardContent>
         </Card>
       </div>
@@ -179,12 +223,12 @@ export default function DashboardPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Weekly Revenue Velocity</CardTitle>
-            <p className="text-xs text-neutral-500">Gross revenue vs appointment volume across days</p>
+            <p className="text-xs text-neutral-500">Gross collected revenue vs appointment volume across past 7 days</p>
           </div>
           <div className="flex items-center gap-2 text-xs font-medium text-neutral-500">
             <span className="flex items-center gap-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-neutral-900 dark:bg-white inline-block" />
-              Revenue ($)
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block" />
+              Revenue ({currency})
             </span>
           </div>
         </CardHeader>
@@ -199,7 +243,13 @@ export default function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="day" stroke="#888888" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#888888" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val / 1000}k`} />
+                <YAxis
+                  stroke="#888888"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(val) => `${currency} ${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`}
+                />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "#171717",
@@ -208,7 +258,7 @@ export default function DashboardPage() {
                     color: "#fff",
                     fontSize: "12px",
                   }}
-                  formatter={(val: any) => [`$${val.toLocaleString()}`, "Revenue"]}
+                  formatter={(val: any) => [formatCurrency(Number(val), currency), "Collected Revenue"]}
                 />
                 <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorRev)" />
               </AreaChart>
@@ -256,10 +306,10 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <Badge variant="secondary" className="text-[10px]">
-                      {new Date(apt.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {formatAppointmentTime(apt.startTime, timezone, "hh:mm a")}
                     </Badge>
                     <div className="text-[10px] text-neutral-400 mt-0.5">
-                      {formatDate(apt.startTime)}
+                      {formatAppointmentTime(apt.startTime, timezone, "MMM d, yyyy")}
                     </div>
                   </div>
                 </div>
@@ -280,21 +330,25 @@ export default function DashboardPage() {
             </Badge>
           </CardHeader>
           <CardContent className="space-y-3">
-            {data.activityLogs.map((log: any) => (
-              <div key={log.id} className="flex items-start gap-3 text-xs border-b border-neutral-100 pb-2.5 dark:border-neutral-800/50 last:border-0">
-                <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 font-bold text-[10px]">
-                  {log.category.slice(0, 1)}
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-neutral-800 dark:text-neutral-200">
-                    {log.description}
+            {data.activityLogs.length === 0 ? (
+              <p className="text-xs text-neutral-400 text-center py-4">No activity logged yet.</p>
+            ) : (
+              data.activityLogs.map((log: any) => (
+                <div key={log.id} className="flex items-start gap-3 text-xs border-b border-neutral-100 pb-2.5 dark:border-neutral-800/50 last:border-0">
+                  <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 font-bold text-[10px]">
+                    {log.category.slice(0, 1)}
                   </div>
-                  <div className="text-[10px] text-neutral-400 mt-0.5">
-                    by <strong className="text-neutral-600 dark:text-neutral-300">{log.actorName}</strong> &bull; {formatDate(log.createdAt)}
+                  <div className="flex-1">
+                    <div className="font-semibold text-neutral-800 dark:text-neutral-200">
+                      {log.description}
+                    </div>
+                    <div className="text-[10px] text-neutral-400 mt-0.5">
+                      by <strong className="text-neutral-600 dark:text-neutral-300">{log.actorName}</strong> &bull; {formatDate(log.createdAt)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

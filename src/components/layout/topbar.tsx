@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { logoutAction } from "@/lib/actions";
 import {
   Search,
   Bell,
@@ -24,6 +26,7 @@ interface TopbarProps {
 }
 
 export function Topbar({ onOpenCommand, onOpenQuickAction }: TopbarProps) {
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [activeCompany, setActiveCompany] = useState("Acme Cloud Technologies");
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
@@ -98,13 +101,15 @@ export function Topbar({ onOpenCommand, onOpenQuickAction }: TopbarProps) {
         </kbd>
       </button>
 
-      {/* Center-Right: Demo Mode Indicator Badge */
-      <div className="hidden md:flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
-        <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-        <span>Demo Environment — Read-Only Mode</span>
-      </div>
+      {/* Center-Right: Demo Mode Indicator Badge */}
+      {process.env.NEXT_PUBLIC_DEMO_MODE === "true" && (
+        <div className="hidden md:flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+          <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+          <span>Demo Environment — Read-Only Mode</span>
+        </div>
+      )}
 
-      /* Right Actions */}
+      {/* Right Actions */}
       <div className="flex items-center gap-3">
         {/* Quick Action Button */}
         <Button onClick={onOpenQuickAction} size="sm" variant="glow" className="gap-1.5">
@@ -185,16 +190,36 @@ export function Topbar({ onOpenCommand, onOpenQuickAction }: TopbarProps) {
                 </Badge>
               </div>
               <div className="mt-1 space-y-0.5">
-                <button className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800">
+                <button
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    router.push("/settings");
+                  }}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
+                >
                   <UserIcon className="h-3.5 w-3.5 text-neutral-400" />
                   <span>Profile & Account</span>
                 </button>
-                <button className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800">
+                <button
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    router.push("/settings");
+                  }}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
+                >
                   <ShieldCheck className="h-3.5 w-3.5 text-neutral-400" />
                   <span>Security & RBAC</span>
                 </button>
                 <div className="my-1 border-t border-neutral-100 dark:border-neutral-800" />
-                <button className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40">
+                <button
+                  onClick={async () => {
+                    setIsUserMenuOpen(false);
+                    await logoutAction();
+                    router.push("/login");
+                    router.refresh();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                >
                   <LogOut className="h-3.5 w-3.5" />
                   <span>Sign Out</span>
                 </button>

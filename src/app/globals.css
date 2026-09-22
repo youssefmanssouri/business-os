@@ -91,3 +91,60 @@
 .glass-panel {
   @apply bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md border border-neutral-200/80 dark:border-neutral-800/80;
 }
+
+/* Dedicated Print Styles for A4 Invoice Documents */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #09090b !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 10pt;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-screen-only,
+  .no-print {
+    display: none !important;
+  }
+
+  .invoice-document {
+    width: 100% !important;
+    max-width: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    color: #09090b !important;
+  }
+
+  .invoice-document * {
+    color-scheme: light !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .invoice-summary,
+  .invoice-notes,
+  .invoice-payment-status,
+  .invoice-parties,
+  .invoice-header {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}

@@ -28,9 +28,12 @@ export function AIDrawer({ isOpen, onClose }: AIDrawerProps) {
 
   const handleGenerate = async () => {
     setIsGenerating(true);
-    setAiOutput("");
     const res = await generateAIInsight(activeTab, promptInput);
-    setAiOutput(res.insight);
+    if (res.success && res.insight) {
+      setAiOutput(res.insight);
+    } else {
+      setAiOutput(res.error || "Unable to generate insights at this time.");
+    }
     setIsGenerating(false);
   };
 
