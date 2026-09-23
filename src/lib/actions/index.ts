@@ -11,7 +11,7 @@ function revalidatePath(path: string) {
     // Graceful no-op when executed outside active Next request context (e.g. automated test runners)
   }
 }
-import { roundMoney, formatCurrency } from "@/lib/utils";
+import { roundMoney, formatCurrency, getInitials } from "@/lib/utils";
 import {
   parseCompanyDateTime,
   parseCompanyDate,
@@ -28,6 +28,7 @@ import {
   clearSessionCookie,
   createSessionToken,
   verifyPassword,
+  hashPassword,
 } from "@/lib/auth";
 import {
   loginSchema,
@@ -38,6 +39,7 @@ import {
   dealUpdateSchema,
   taskCreateSchema,
   taskUpdateStatusSchema,
+  taskDeleteSchema,
   invoiceCreateSchema,
   invoiceStatusUpdateSchema,
   invoiceUpdateSchema,
@@ -47,6 +49,17 @@ import {
   appointmentStatusUpdateSchema,
   serviceCreateSchema,
   serviceUpdateSchema,
+  productCreateSchema,
+  productUpdateSchema,
+  productDeleteSchema,
+  employeeCreateSchema,
+  employeeUpdateSchema,
+  financeRecordCreateSchema,
+  financeRecordUpdateSchema,
+  financeRecordDeleteSchema,
+  documentCreateSchema,
+  documentUpdateSchema,
+  documentDeleteSchema,
 } from "@/lib/validations";
 
 /**
@@ -947,7 +960,76 @@ export async function deleteCustomer(customerId: string) {
 }
 
 /**
- * Creates a new task scoped strictly to authenticated tenant
+ * Retrieves all tasks strictly scoped to the authenticated tenant.
+ * Includes assigned user details and active company staff list for assignment dropdowns.
+ */
+export async function getTasksData() {
+  try {
+    const session = await requireAuth();
+
+    const [tasks, staff] = await Promise.all([
+      db.task.findMany({
+        where: { companyId: session.companyId },
+        include: {
+          assignee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatar: true,
+              role: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.user.findMany({
+        where: {
+          companyId: session.companyId,
+          status: "ACTIVE",
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatar: true,
+          role: true,
+        },
+        orderBy: { name: "asc" },
+      }),
+    ]);
+
+    return {
+      success: true,
+      tasks: tasks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        description: t.description || "",
+        status: t.status as "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE",
+        priority: t.priority as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
+        assigneeId: t.assigneeId,
+        assigneeName: t.assignee?.name || "Unassigned",
+        assigneeAvatar: t.assignee?.avatar || null,
+        dueDate: t.dueDate ? t.dueDate.toISOString() : null,
+        tags: t.tags || "General",
+        createdAt: t.createdAt.toISOString(),
+      })),
+      staff,
+    };
+  } catch (error: any) {
+    console.error("Error retrieving tasks:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to retrieve tasks",
+      code: error?.status || 500,
+      tasks: [],
+      staff: [],
+    };
+  }
+}
+
+/**
+ * Creates a new task scoped strictly to authenticated tenant with assignee validation
  */
 export async function createNewTask(rawInput: unknown) {
   try {
@@ -964,15 +1046,49 @@ export async function createNewTask(rawInput: unknown) {
 
     const data = parseResult.data;
 
+    // Server-side Assignee Validation (Cross-Tenant Assignee Protection)
+    let resolvedAssigneeId: string | null = session.userId;
+    if (data.assigneeId && data.assigneeId.trim() !== "") {
+      const validAssignee = await db.user.findFirst({
+        where: {
+          id: data.assigneeId,
+          companyId: session.companyId,
+        },
+      });
+
+      if (!validAssignee) {
+        return {
+          success: false,
+          error: "Assignee not found or belongs to another company.",
+          code: 400,
+        };
+      }
+      resolvedAssigneeId = validAssignee.id;
+    }
+
+    const parsedDueDate = data.dueDate && data.dueDate.trim() !== "" ? new Date(data.dueDate) : null;
+
     const task = await db.task.create({
       data: {
         companyId: session.companyId,
         title: data.title,
         description: data.description || "",
         priority: data.priority,
-        status: "TODO",
+        status: data.status || "TODO",
         tags: data.tags || "General",
-        assigneeId: session.userId,
+        assigneeId: resolvedAssigneeId,
+        dueDate: parsedDueDate,
+      },
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            role: true,
+          },
+        },
       },
     });
 
@@ -988,7 +1104,22 @@ export async function createNewTask(rawInput: unknown) {
 
     revalidatePath("/tasks");
     revalidatePath("/");
-    return { success: true, task };
+    return {
+      success: true,
+      task: {
+        id: task.id,
+        title: task.title,
+        description: task.description || "",
+        status: task.status as "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE",
+        priority: task.priority as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
+        assigneeId: task.assigneeId,
+        assigneeName: task.assignee?.name || "Unassigned",
+        assigneeAvatar: task.assignee?.avatar || null,
+        dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+        tags: task.tags || "General",
+        createdAt: task.createdAt.toISOString(),
+      },
+    };
   } catch (error: any) {
     console.error("Error creating task:", error);
     return {
@@ -1037,6 +1168,17 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
     const task = await db.task.update({
       where: { id: validated.taskId },
       data: { status: validated.newStatus },
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            role: true,
+          },
+        },
+      },
     });
 
     await db.activityLog.create({
@@ -1050,7 +1192,23 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
     });
 
     revalidatePath("/tasks");
-    return { success: true, task };
+    revalidatePath("/");
+    return {
+      success: true,
+      task: {
+        id: task.id,
+        title: task.title,
+        description: task.description || "",
+        status: task.status as "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE",
+        priority: task.priority as "LOW" | "MEDIUM" | "HIGH" | "URGENT",
+        assigneeId: task.assigneeId,
+        assigneeName: task.assignee?.name || "Unassigned",
+        assigneeAvatar: task.assignee?.avatar || null,
+        dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+        tags: task.tags || "General",
+        createdAt: task.createdAt.toISOString(),
+      },
+    };
   } catch (error: any) {
     console.error("Error updating task:", error);
     return {
@@ -1060,6 +1218,1375 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
     };
   }
 }
+
+/**
+ * Deletes a task with strict Tenant Boundary Verification and Role Authorization.
+ * Only ADMIN and MANAGER roles can delete tasks.
+ */
+export async function deleteTask(rawInput: unknown) {
+  try {
+    const session = await requireAuth();
+    await requireRole(["ADMIN", "MANAGER"]);
+
+    const input = typeof rawInput === "string" ? { taskId: rawInput } : rawInput;
+    const parseResult = taskDeleteSchema.safeParse(input);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid task ID",
+        code: 400,
+      };
+    }
+
+    const { taskId } = parseResult.data;
+
+    // Verify task exists AND belongs to the authenticated tenant (IDOR Protection)
+    const existingTask = await db.task.findFirst({
+      where: {
+        id: taskId,
+        companyId: session.companyId,
+      },
+    });
+
+    if (!existingTask) {
+      return {
+        success: false,
+        error: "Task not found or access denied.",
+        code: 404,
+      };
+    }
+
+    await db.task.delete({
+      where: { id: taskId },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "TASK_DELETED",
+        category: "TASKS",
+        description: `Task "${existingTask.title}" deleted`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/tasks");
+    revalidatePath("/");
+    return { success: true, taskId };
+  } catch (error: any) {
+    console.error("Error deleting task:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to delete task",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Retrieves all inventory products strictly scoped to the authenticated tenant.
+ */
+export async function getInventoryData() {
+  try {
+    const session = await requireAuth();
+
+    const [products, company] = await Promise.all([
+      db.product.findMany({
+        where: { companyId: session.companyId },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.company.findUnique({
+        where: { id: session.companyId },
+        select: {
+          id: true,
+          name: true,
+          currency: true,
+        },
+      }),
+    ]);
+
+    return {
+      success: true,
+      products: products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        category: p.category,
+        price: p.price,
+        cost: p.cost,
+        stock: p.stock,
+        minStockAlert: p.minStockAlert,
+        supplier: p.supplier || "Global Supply Co",
+        barcode: p.barcode || "",
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
+      })),
+      company: company || {
+        id: session.companyId,
+        name: "Organization",
+        currency: "USD",
+      },
+    };
+  } catch (error: any) {
+    console.error("Error retrieving inventory data:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to retrieve inventory data",
+      code: error?.status || 500,
+      products: [],
+      company: {
+        id: "",
+        name: "",
+        currency: "USD",
+      },
+    };
+  }
+}
+
+/**
+ * Creates a new product in the inventory strictly scoped to the authenticated tenant.
+ * Enforces tenant-scoped SKU uniqueness and RBAC (ADMIN or MANAGER only).
+ */
+export async function createProduct(rawInput: unknown) {
+  try {
+    const session = await requireRole(["ADMIN", "MANAGER"]);
+    const parseResult = productCreateSchema.safeParse(rawInput);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid product input",
+        code: 400,
+      };
+    }
+
+    const data = parseResult.data;
+
+    // Tenant-Scoped SKU Uniqueness Check
+    const existingSku = await db.product.findUnique({
+      where: {
+        companyId_sku: {
+          companyId: session.companyId,
+          sku: data.sku,
+        },
+      },
+    });
+
+    if (existingSku) {
+      return {
+        success: false,
+        error: `A product with SKU '${data.sku}' already exists in your inventory.`,
+        code: 400,
+      };
+    }
+
+    const cost = data.cost !== undefined ? data.cost : Number((data.price * 0.6).toFixed(2));
+
+    const product = await db.product.create({
+      data: {
+        companyId: session.companyId,
+        name: data.name,
+        sku: data.sku,
+        category: data.category,
+        price: data.price,
+        cost,
+        stock: data.stock,
+        minStockAlert: data.minStockAlert,
+        supplier: data.supplier || "Global Supply Co",
+        barcode: data.barcode || "",
+      },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "PRODUCT_CREATED",
+        category: "INVENTORY",
+        description: `Added product "${product.name}" (SKU: ${product.sku})`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/inventory");
+    revalidatePath("/");
+    return {
+      success: true,
+      product: {
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        category: product.category,
+        price: product.price,
+        cost: product.cost,
+        stock: product.stock,
+        minStockAlert: product.minStockAlert,
+        supplier: product.supplier || "Global Supply Co",
+        barcode: product.barcode || "",
+        createdAt: product.createdAt.toISOString(),
+        updatedAt: product.updatedAt.toISOString(),
+      },
+    };
+  } catch (error: any) {
+    console.error("Error creating product:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to create product",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Updates a product with strict Tenant Boundary Verification and RBAC.
+ */
+export async function updateProduct(rawInput: unknown) {
+  try {
+    const session = await requireRole(["ADMIN", "MANAGER"]);
+    const parseResult = productUpdateSchema.safeParse(rawInput);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid update data",
+        code: 400,
+      };
+    }
+
+    const data = parseResult.data;
+
+    // Verify product exists and belongs to the authenticated tenant (IDOR Protection)
+    const existingProduct = await db.product.findFirst({
+      where: {
+        id: data.productId,
+        companyId: session.companyId,
+      },
+    });
+
+    if (!existingProduct) {
+      return {
+        success: false,
+        error: "Product not found or access denied.",
+        code: 404,
+      };
+    }
+
+    // If SKU is changing, verify tenant uniqueness
+    if (data.sku && data.sku !== existingProduct.sku) {
+      const skuConflict = await db.product.findUnique({
+        where: {
+          companyId_sku: {
+            companyId: session.companyId,
+            sku: data.sku,
+          },
+        },
+      });
+
+      if (skuConflict && skuConflict.id !== data.productId) {
+        return {
+          success: false,
+          error: `SKU '${data.sku}' is already in use by another product.`,
+          code: 400,
+        };
+      }
+    }
+
+    const updated = await db.product.update({
+      where: { id: data.productId },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.sku && { sku: data.sku }),
+        ...(data.category && { category: data.category }),
+        ...(data.price !== undefined && { price: data.price }),
+        ...(data.cost !== undefined && { cost: data.cost }),
+        ...(data.stock !== undefined && { stock: data.stock }),
+        ...(data.minStockAlert !== undefined && { minStockAlert: data.minStockAlert }),
+        ...(data.supplier !== undefined && { supplier: data.supplier }),
+        ...(data.barcode !== undefined && { barcode: data.barcode }),
+      },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "PRODUCT_UPDATED",
+        category: "INVENTORY",
+        description: `Updated product "${updated.name}" (SKU: ${updated.sku})`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/inventory");
+    revalidatePath("/");
+    return {
+      success: true,
+      product: {
+        id: updated.id,
+        name: updated.name,
+        sku: updated.sku,
+        category: updated.category,
+        price: updated.price,
+        cost: updated.cost,
+        stock: updated.stock,
+        minStockAlert: updated.minStockAlert,
+        supplier: updated.supplier || "Global Supply Co",
+        barcode: updated.barcode || "",
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      },
+    };
+  } catch (error: any) {
+    console.error("Error updating product:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to update product",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Deletes a product with strict Tenant Boundary Verification and RBAC.
+ */
+export async function deleteProduct(rawInput: unknown) {
+  try {
+    const session = await requireRole(["ADMIN", "MANAGER"]);
+    const input = typeof rawInput === "string" ? { productId: rawInput } : rawInput;
+    const parseResult = productDeleteSchema.safeParse(input);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid product ID",
+        code: 400,
+      };
+    }
+
+    const { productId } = parseResult.data;
+
+    // Verify product belongs to authenticated company (IDOR Protection)
+    const existing = await db.product.findFirst({
+      where: {
+        id: productId,
+        companyId: session.companyId,
+      },
+    });
+
+    if (!existing) {
+      return {
+        success: false,
+        error: "Product not found or access denied.",
+        code: 404,
+      };
+    }
+
+    await db.product.delete({
+      where: { id: productId },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "PRODUCT_DELETED",
+        category: "INVENTORY",
+        description: `Deleted product "${existing.name}" (SKU: ${existing.sku})`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/inventory");
+    revalidatePath("/");
+    return { success: true, productId };
+  } catch (error: any) {
+    console.error("Error deleting product:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to delete product",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Retrieves all employees/users strictly scoped to the authenticated tenant.
+ * Excludes sensitive fields like passwordHash.
+ */
+export async function getEmployeesData() {
+  try {
+    const session = await requireAuth();
+
+    const [employees, company] = await Promise.all([
+      db.user.findMany({
+        where: { companyId: session.companyId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          department: true,
+          title: true,
+          phone: true,
+          avatar: true,
+          status: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "asc" },
+      }),
+      db.company.findUnique({
+        where: { id: session.companyId },
+        select: {
+          id: true,
+          name: true,
+        },
+      }),
+    ]);
+
+    return {
+      success: true,
+      employees: employees.map((e) => ({
+        id: e.id,
+        name: e.name,
+        email: e.email,
+        role: e.role as "ADMIN" | "MANAGER" | "EMPLOYEE",
+        department: e.department || "General",
+        title: e.title || "Staff Specialist",
+        phone: e.phone || "",
+        avatar: e.avatar || null,
+        status: e.status as "ACTIVE" | "ON_LEAVE" | "INACTIVE",
+        createdAt: e.createdAt.toISOString(),
+      })),
+      company: company || {
+        id: session.companyId,
+        name: "Organization",
+      },
+      currentUserId: session.userId,
+      currentUserRole: session.role,
+    };
+  } catch (error: any) {
+    console.error("Error retrieving employees data:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to retrieve employee directory",
+      code: error?.status || 500,
+      employees: [],
+      company: { id: "", name: "" },
+      currentUserId: "",
+      currentUserRole: "EMPLOYEE",
+    };
+  }
+}
+
+/**
+ * Creates a new employee user strictly scoped to the authenticated tenant.
+ * Enforces RBAC: Only ADMIN and MANAGER can create employees; MANAGER cannot create ADMIN users.
+ */
+export async function createEmployee(rawInput: unknown) {
+  try {
+    const session = await requireRole(["ADMIN", "MANAGER"]);
+    const parseResult = employeeCreateSchema.safeParse(rawInput);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid employee data",
+        code: 400,
+      };
+    }
+
+    const data = parseResult.data;
+
+    // RBAC: Only ADMIN can assign the ADMIN role
+    if (data.role === "ADMIN" && session.role !== "ADMIN") {
+      return {
+        success: false,
+        error: "Only administrators can assign the ADMIN role.",
+        code: 403,
+      };
+    }
+
+    // Check if email already registered across system
+    const existingUser = await db.user.findUnique({
+      where: { email: data.email },
+    });
+
+    if (existingUser) {
+      return {
+        success: false,
+        error: "A user with this email address already exists.",
+        code: 400,
+      };
+    }
+
+    const passwordHash = await hashPassword(data.password || "TempPassword123!");
+
+    const user = await db.user.create({
+      data: {
+        companyId: session.companyId,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+        department: data.department,
+        title: data.title,
+        phone: data.phone || null,
+        status: data.status,
+        passwordHash,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        department: true,
+        title: true,
+        phone: true,
+        avatar: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "EMPLOYEE_CREATED",
+        category: "EMPLOYEES",
+        description: `Added team member "${user.name}" (${user.role} - ${user.department})`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/employees");
+    revalidatePath("/");
+    return {
+      success: true,
+      employee: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role as "ADMIN" | "MANAGER" | "EMPLOYEE",
+        department: user.department || "General",
+        title: user.title || "Staff Specialist",
+        phone: user.phone || "",
+        avatar: user.avatar || null,
+        status: user.status as "ACTIVE" | "ON_LEAVE" | "INACTIVE",
+        createdAt: user.createdAt.toISOString(),
+      },
+    };
+  } catch (error: any) {
+    console.error("Error creating employee:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to create employee",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Updates an employee's details with strict Tenant Boundary Verification and RBAC.
+ */
+export async function updateEmployee(rawInput: unknown) {
+  try {
+    const session = await requireRole(["ADMIN", "MANAGER"]);
+    const parseResult = employeeUpdateSchema.safeParse(rawInput);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid update data",
+        code: 400,
+      };
+    }
+
+    const data = parseResult.data;
+
+    // Verify employee belongs to authenticated tenant (IDOR Defense)
+    const targetUser = await db.user.findFirst({
+      where: {
+        id: data.employeeId,
+        companyId: session.companyId,
+      },
+    });
+
+    if (!targetUser) {
+      return {
+        success: false,
+        error: "Employee not found or access denied.",
+        code: 404,
+      };
+    }
+
+    // RBAC: MANAGER cannot modify an ADMIN, nor elevate someone to ADMIN
+    if (session.role === "MANAGER") {
+      if (targetUser.role === "ADMIN") {
+        return {
+          success: false,
+          error: "Managers cannot modify administrator accounts.",
+          code: 403,
+        };
+      }
+      if (data.role === "ADMIN") {
+        return {
+          success: false,
+          error: "Only administrators can assign the ADMIN role.",
+          code: 403,
+        };
+      }
+    }
+
+    const updated = await db.user.update({
+      where: { id: data.employeeId },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.role && { role: data.role }),
+        ...(data.department && { department: data.department }),
+        ...(data.title && { title: data.title }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+        ...(data.status && { status: data.status }),
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        department: true,
+        title: true,
+        phone: true,
+        avatar: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "EMPLOYEE_UPDATED",
+        category: "EMPLOYEES",
+        description: `Updated profile for team member "${updated.name}"`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/employees");
+    revalidatePath("/");
+    return {
+      success: true,
+      employee: {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        role: updated.role as "ADMIN" | "MANAGER" | "EMPLOYEE",
+        department: updated.department || "General",
+        title: updated.title || "Staff Specialist",
+        phone: updated.phone || "",
+        avatar: updated.avatar || null,
+        status: updated.status as "ACTIVE" | "ON_LEAVE" | "INACTIVE",
+        createdAt: updated.createdAt.toISOString(),
+      },
+    };
+  } catch (error: any) {
+    console.error("Error updating employee:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to update employee",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Updates an employee's status (ACTIVE, ON_LEAVE, INACTIVE) with tenant boundary verification.
+ */
+export async function updateEmployeeStatus(employeeId: string, status: string) {
+  try {
+    const session = await requireRole(["ADMIN", "MANAGER"]);
+
+    if (!employeeId || typeof employeeId !== "string") {
+      return { success: false, error: "Invalid employee ID", code: 400 };
+    }
+
+    const validStatuses = ["ACTIVE", "ON_LEAVE", "INACTIVE"];
+    if (!validStatuses.includes(status)) {
+      return {
+        success: false,
+        error: `Status must be one of: ${validStatuses.join(", ")}`,
+        code: 400,
+      };
+    }
+
+    // Verify employee belongs to authenticated tenant (IDOR Defense)
+    const targetUser = await db.user.findFirst({
+      where: {
+        id: employeeId,
+        companyId: session.companyId,
+      },
+    });
+
+    if (!targetUser) {
+      return {
+        success: false,
+        error: "Employee not found or access denied.",
+        code: 404,
+      };
+    }
+
+    // RBAC: MANAGER cannot change ADMIN status
+    if (session.role === "MANAGER" && targetUser.role === "ADMIN") {
+      return {
+        success: false,
+        error: "Managers cannot modify administrator accounts.",
+        code: 403,
+      };
+    }
+
+    const updated = await db.user.update({
+      where: { id: employeeId },
+      data: { status },
+      select: { id: true, name: true, status: true },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "EMPLOYEE_STATUS_CHANGED",
+        category: "EMPLOYEES",
+        description: `Changed status of "${updated.name}" to ${status}`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/employees");
+    revalidatePath("/");
+    return { success: true, employeeId, status: updated.status };
+  } catch (error: any) {
+    console.error("Error changing employee status:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to change employee status",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Retrieves all finance records and monthly aggregates strictly scoped to authenticated tenant.
+ */
+export async function getFinanceData() {
+  try {
+    const session = await requireAuth();
+
+    const [records, company] = await Promise.all([
+      db.financeRecord.findMany({
+        where: { companyId: session.companyId },
+        orderBy: { date: "desc" },
+      }),
+      db.company.findUnique({
+        where: { id: session.companyId },
+        select: {
+          id: true,
+          name: true,
+          currency: true,
+          taxRate: true,
+        },
+      }),
+    ]);
+
+    const formattedRecords = records.map((r) => ({
+      id: r.id,
+      type: r.type as "REVENUE" | "EXPENSE",
+      category: r.category,
+      amount: r.amount,
+      date: r.date.toISOString(),
+      description: r.description,
+      status: r.status as "SETTLED" | "PENDING",
+      createdAt: r.createdAt.toISOString(),
+    }));
+
+    // Calculate real totals
+    const totalRev = formattedRecords
+      .filter((r) => r.type === "REVENUE")
+      .reduce((s, r) => s + r.amount, 0);
+
+    const totalExp = formattedRecords
+      .filter((r) => r.type === "EXPENSE")
+      .reduce((s, r) => s + r.amount, 0);
+
+    const netProfit = totalRev - totalExp;
+    const taxRate = company?.taxRate !== undefined ? company.taxRate / 100 : 0.1;
+    const estimatedTax = netProfit > 0 ? Number((netProfit * taxRate).toFixed(2)) : 0;
+
+    // Build monthly velocity chart from real records (past 6 months)
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const now = new Date();
+    const monthlyMap: Record<string, { month: string; revenue: number; expenses: number }> = {};
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      monthlyMap[key] = {
+        month: months[d.getMonth()],
+        revenue: 0,
+        expenses: 0,
+      };
+    }
+
+    formattedRecords.forEach((r) => {
+      const d = new Date(r.date);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      if (monthlyMap[key]) {
+        if (r.type === "REVENUE") {
+          monthlyMap[key].revenue += r.amount;
+        } else {
+          monthlyMap[key].expenses += r.amount;
+        }
+      }
+    });
+
+    const cashFlowData = Object.values(monthlyMap);
+
+    return {
+      success: true,
+      records: formattedRecords,
+      company: company || {
+        id: session.companyId,
+        name: "Organization",
+        currency: "USD",
+        taxRate: 10.0,
+      },
+      cashFlowData,
+      totals: {
+        totalRev,
+        totalExp,
+        netProfit,
+        estimatedTax,
+      },
+    };
+  } catch (error: any) {
+    console.error("Error retrieving finance data:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to retrieve financial ledger",
+      code: error?.status || 500,
+      records: [],
+      company: { id: "", name: "", currency: "USD", taxRate: 10.0 },
+      cashFlowData: [],
+      totals: { totalRev: 0, totalExp: 0, netProfit: 0, estimatedTax: 0 },
+    };
+  }
+}
+
+/**
+ * Creates a financial ledger transaction strictly scoped to authenticated tenant.
+ */
+export async function createFinanceRecord(rawInput: unknown) {
+  try {
+    const session = await requireRole(["ADMIN", "MANAGER"]);
+    const parseResult = financeRecordCreateSchema.safeParse(rawInput);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid finance record input",
+        code: 400,
+      };
+    }
+
+    const data = parseResult.data;
+    const parsedDate = data.date && data.date.trim() !== "" ? new Date(data.date) : new Date();
+
+    const record = await db.financeRecord.create({
+      data: {
+        companyId: session.companyId,
+        type: data.type,
+        category: data.category,
+        amount: data.amount,
+        date: parsedDate,
+        description: data.description,
+        status: data.status,
+      },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "FINANCE_RECORD_CREATED",
+        category: "FINANCE",
+        description: `Logged ${data.type} of $${data.amount.toFixed(2)} (${data.category}): ${data.description}`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/finance");
+    revalidatePath("/");
+    return {
+      success: true,
+      record: {
+        id: record.id,
+        type: record.type as "REVENUE" | "EXPENSE",
+        category: record.category,
+        amount: record.amount,
+        date: record.date.toISOString(),
+        description: record.description,
+        status: record.status as "SETTLED" | "PENDING",
+        createdAt: record.createdAt.toISOString(),
+      },
+    };
+  } catch (error: any) {
+    console.error("Error creating finance record:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to log transaction",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Updates a financial ledger record with tenant boundary verification.
+ */
+export async function updateFinanceRecord(rawInput: unknown) {
+  try {
+    const session = await requireRole(["ADMIN", "MANAGER"]);
+    const parseResult = financeRecordUpdateSchema.safeParse(rawInput);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid update data",
+        code: 400,
+      };
+    }
+
+    const data = parseResult.data;
+
+    // Verify record exists and belongs to authenticated tenant (IDOR Defense)
+    const existing = await db.financeRecord.findFirst({
+      where: {
+        id: data.recordId,
+        companyId: session.companyId,
+      },
+    });
+
+    if (!existing) {
+      return {
+        success: false,
+        error: "Finance record not found or access denied.",
+        code: 404,
+      };
+    }
+
+    const updated = await db.financeRecord.update({
+      where: { id: data.recordId },
+      data: {
+        ...(data.type && { type: data.type }),
+        ...(data.category && { category: data.category }),
+        ...(data.amount !== undefined && { amount: data.amount }),
+        ...(data.date && { date: new Date(data.date) }),
+        ...(data.description && { description: data.description }),
+        ...(data.status && { status: data.status }),
+      },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "FINANCE_RECORD_UPDATED",
+        category: "FINANCE",
+        description: `Updated finance record: ${updated.description}`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/finance");
+    revalidatePath("/");
+    return {
+      success: true,
+      record: {
+        id: updated.id,
+        type: updated.type as "REVENUE" | "EXPENSE",
+        category: updated.category,
+        amount: updated.amount,
+        date: updated.date.toISOString(),
+        description: updated.description,
+        status: updated.status as "SETTLED" | "PENDING",
+        createdAt: updated.createdAt.toISOString(),
+      },
+    };
+  } catch (error: any) {
+    console.error("Error updating finance record:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to update transaction",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Deletes a financial ledger record with tenant boundary verification.
+ */
+export async function deleteFinanceRecord(rawInput: unknown) {
+  try {
+    const session = await requireRole(["ADMIN", "MANAGER"]);
+    const input = typeof rawInput === "string" ? { recordId: rawInput } : rawInput;
+    const parseResult = financeRecordDeleteSchema.safeParse(input);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid record ID",
+        code: 400,
+      };
+    }
+
+    const { recordId } = parseResult.data;
+
+    // Verify record belongs to authenticated tenant (IDOR Defense)
+    const existing = await db.financeRecord.findFirst({
+      where: {
+        id: recordId,
+        companyId: session.companyId,
+      },
+    });
+
+    if (!existing) {
+      return {
+        success: false,
+        error: "Finance record not found or access denied.",
+        code: 404,
+      };
+    }
+
+    await db.financeRecord.delete({
+      where: { id: recordId },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "FINANCE_RECORD_DELETED",
+        category: "FINANCE",
+        description: `Deleted finance record: ${existing.description} ($${existing.amount.toFixed(2)})`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/finance");
+    revalidatePath("/");
+    return { success: true, recordId };
+  } catch (error: any) {
+    console.error("Error deleting finance record:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to delete transaction",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Retrieves all document metadata strictly scoped to authenticated tenant.
+ */
+export async function getDocumentsData() {
+  try {
+    const session = await requireAuth();
+
+    const [documents, company] = await Promise.all([
+      db.document.findMany({
+        where: { companyId: session.companyId },
+        include: {
+          uploadedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.company.findUnique({
+        where: { id: session.companyId },
+        select: {
+          id: true,
+          name: true,
+        },
+      }),
+    ]);
+
+    return {
+      success: true,
+      documents: documents.map((d) => ({
+        id: d.id,
+        name: d.name,
+        category: d.category,
+        size: d.size,
+        url: d.url || null,
+        mimeType: d.mimeType,
+        tags: d.tags || "General",
+        uploadedById: d.uploadedById,
+        uploadedByName: d.uploadedBy?.name || "System User",
+        createdAt: d.createdAt.toISOString(),
+      })),
+      company: company || {
+        id: session.companyId,
+        name: "Organization",
+      },
+      currentUserId: session.userId,
+      currentUserRole: session.role,
+    };
+  } catch (error: any) {
+    console.error("Error retrieving documents data:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to retrieve documents vault",
+      code: error?.status || 500,
+      documents: [],
+      company: { id: "", name: "" },
+      currentUserId: "",
+      currentUserRole: "EMPLOYEE",
+    };
+  }
+}
+
+/**
+ * Indexes/registers document metadata in the tenant vault.
+ */
+export async function createDocument(rawInput: unknown) {
+  try {
+    const session = await requireAuth();
+    const parseResult = documentCreateSchema.safeParse(rawInput);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid document input",
+        code: 400,
+      };
+    }
+
+    const data = parseResult.data;
+
+    const doc = await db.document.create({
+      data: {
+        companyId: session.companyId,
+        uploadedById: session.userId,
+        name: data.name,
+        category: data.category,
+        size: data.size || "1.5 MB",
+        url: data.url || null,
+        mimeType: data.mimeType || "application/pdf",
+        tags: data.tags || "General",
+      },
+      include: {
+        uploadedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "DOCUMENT_INDEXED",
+        category: "DOCUMENTS",
+        description: `Indexed document "${doc.name}" in category ${doc.category}`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/documents");
+    revalidatePath("/");
+    return {
+      success: true,
+      document: {
+        id: doc.id,
+        name: doc.name,
+        category: doc.category,
+        size: doc.size,
+        url: doc.url,
+        mimeType: doc.mimeType,
+        tags: doc.tags || "General",
+        uploadedById: doc.uploadedById,
+        uploadedByName: doc.uploadedBy?.name || session.name,
+        createdAt: doc.createdAt.toISOString(),
+      },
+    };
+  } catch (error: any) {
+    console.error("Error indexing document:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to index document",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Updates document metadata with tenant boundary verification.
+ */
+export async function updateDocument(rawInput: unknown) {
+  try {
+    const session = await requireAuth();
+    const parseResult = documentUpdateSchema.safeParse(rawInput);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid update data",
+        code: 400,
+      };
+    }
+
+    const data = parseResult.data;
+
+    // Verify document belongs to tenant (IDOR Defense)
+    const existing = await db.document.findFirst({
+      where: {
+        id: data.documentId,
+        companyId: session.companyId,
+      },
+    });
+
+    if (!existing) {
+      return {
+        success: false,
+        error: "Document not found or access denied.",
+        code: 404,
+      };
+    }
+
+    // RBAC: If EMPLOYEE, can only update if they uploaded it
+    if (session.role === "EMPLOYEE" && existing.uploadedById !== session.userId) {
+      return {
+        success: false,
+        error: "Forbidden: You may only modify documents you uploaded.",
+        code: 403,
+      };
+    }
+
+    const updated = await db.document.update({
+      where: { id: data.documentId },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.category && { category: data.category }),
+        ...(data.tags && { tags: data.tags }),
+      },
+      include: {
+        uploadedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "DOCUMENT_UPDATED",
+        category: "DOCUMENTS",
+        description: `Updated document metadata for "${updated.name}"`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/documents");
+    revalidatePath("/");
+    return {
+      success: true,
+      document: {
+        id: updated.id,
+        name: updated.name,
+        category: updated.category,
+        size: updated.size,
+        url: updated.url,
+        mimeType: updated.mimeType,
+        tags: updated.tags || "General",
+        uploadedById: updated.uploadedById,
+        uploadedByName: updated.uploadedBy?.name || session.name,
+        createdAt: updated.createdAt.toISOString(),
+      },
+    };
+  } catch (error: any) {
+    console.error("Error updating document:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to update document",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Deletes document metadata with tenant boundary verification and RBAC.
+ */
+export async function deleteDocument(rawInput: unknown) {
+  try {
+    const session = await requireRole(["ADMIN", "MANAGER"]);
+    const input = typeof rawInput === "string" ? { documentId: rawInput } : rawInput;
+    const parseResult = documentDeleteSchema.safeParse(input);
+
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid document ID",
+        code: 400,
+      };
+    }
+
+    const { documentId } = parseResult.data;
+
+    // Verify document belongs to tenant (IDOR Defense)
+    const existing = await db.document.findFirst({
+      where: {
+        id: documentId,
+        companyId: session.companyId,
+      },
+    });
+
+    if (!existing) {
+      return {
+        success: false,
+        error: "Document not found or access denied.",
+        code: 404,
+      };
+    }
+
+    await db.document.delete({
+      where: { id: documentId },
+    });
+
+    await db.activityLog.create({
+      data: {
+        companyId: session.companyId,
+        action: "DOCUMENT_DELETED",
+        category: "DOCUMENTS",
+        description: `Deleted document "${existing.name}" from repository`,
+        actorName: session.name,
+      },
+    });
+
+    revalidatePath("/documents");
+    revalidatePath("/");
+    return { success: true, documentId };
+  } catch (error: any) {
+    console.error("Error deleting document:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to delete document",
+      code: error?.status || 500,
+    };
+  }
+}
+
 
 
 
@@ -2911,3 +4438,428 @@ export async function updateService(rawInput: unknown) {
     };
   }
 }
+
+/**
+ * ==============================================================================
+ * Global Shell & Identity Actions (Phase 8B-1)
+ * ==============================================================================
+ */
+
+/**
+ * Retrieves real database notifications for the authenticated tenant/user.
+ * Strictly scoped to session.companyId and current user.
+ */
+export async function getNotifications() {
+  try {
+    const session = await requireAuth();
+
+    const notifications = await db.notification.findMany({
+      where: {
+        companyId: session.companyId,
+        OR: [{ userId: null }, { userId: session.userId }],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 15,
+      select: {
+        id: true,
+        title: true,
+        message: true,
+        type: true,
+        isRead: true,
+        createdAt: true,
+      },
+    });
+
+    const unreadCount = await db.notification.count({
+      where: {
+        companyId: session.companyId,
+        isRead: false,
+        OR: [{ userId: null }, { userId: session.userId }],
+      },
+    });
+
+    return {
+      success: true,
+      notifications: notifications.map((n) => ({
+        ...n,
+        createdAt: n.createdAt.toISOString(),
+      })),
+      unreadCount,
+    };
+  } catch (error: any) {
+    console.error("Error retrieving notifications:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to retrieve notifications",
+      code: error?.status || 500,
+      notifications: [],
+      unreadCount: 0,
+    };
+  }
+}
+
+/**
+ * Queries the real open-task count strictly scoped to authenticated tenant.
+ * Open tasks are defined as: TODO, IN_PROGRESS, REVIEW (excluding DONE).
+ */
+export async function getOpenTaskCount() {
+  try {
+    const session = await requireAuth();
+
+    const count = await db.task.count({
+      where: {
+        companyId: session.companyId,
+        status: { in: ["TODO", "IN_PROGRESS", "REVIEW"] },
+      },
+    });
+
+    return {
+      success: true,
+      count,
+    };
+  } catch (error: any) {
+    console.error("Error counting open tasks:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to count open tasks",
+      code: error?.status || 500,
+      count: 0,
+    };
+  }
+}
+
+export interface ShellData {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: "ADMIN" | "MANAGER" | "EMPLOYEE";
+    initials: string;
+  };
+  company: {
+    id: string;
+    name: string;
+    plan: string;
+  };
+  openTaskCount: number;
+  notifications: Array<{
+    id: string;
+    title: string;
+    message: string;
+    type: string;
+    isRead: boolean;
+    createdAt: string;
+  }>;
+  unreadNotificationCount: number;
+}
+
+/**
+ * Retrieves authoritative shell data for the authenticated session:
+ * - Dynamic user identity (name, email, role, initials)
+ * - Dynamic company name and plan from database
+ * - Real open task count
+ * - Real notification items and unread count
+ */
+export async function getShellData(): Promise<{
+  success: boolean;
+  error?: string;
+  code?: number;
+  data?: ShellData;
+}> {
+  try {
+    const session = await requireAuth();
+
+    const [company, openTaskCount, notifications, unreadCount] = await Promise.all([
+      db.company.findUnique({
+        where: { id: session.companyId },
+        select: { id: true, name: true, plan: true },
+      }),
+      db.task.count({
+        where: {
+          companyId: session.companyId,
+          status: { in: ["TODO", "IN_PROGRESS", "REVIEW"] },
+        },
+      }),
+      db.notification.findMany({
+        where: {
+          companyId: session.companyId,
+          OR: [{ userId: null }, { userId: session.userId }],
+        },
+        orderBy: { createdAt: "desc" },
+        take: 15,
+        select: {
+          id: true,
+          title: true,
+          message: true,
+          type: true,
+          isRead: true,
+          createdAt: true,
+        },
+      }),
+      db.notification.count({
+        where: {
+          companyId: session.companyId,
+          isRead: false,
+          OR: [{ userId: null }, { userId: session.userId }],
+        },
+      }),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        user: {
+          id: session.userId,
+          name: session.name,
+          email: session.email,
+          role: session.role,
+          initials: getInitials(session.name),
+        },
+        company: {
+          id: session.companyId,
+          name: company?.name || "Organization",
+          plan: company?.plan || "PRO",
+        },
+        openTaskCount,
+        notifications: notifications.map((n) => ({
+          ...n,
+          createdAt: n.createdAt.toISOString(),
+        })),
+        unreadNotificationCount: unreadCount,
+      },
+    };
+  } catch (error: any) {
+    console.error("Error retrieving shell data:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to retrieve shell data",
+      code: error?.status || 500,
+    };
+  }
+}
+
+/**
+ * Retrieves real multi-dimensional business analytics derived from database records.
+ * Strictly tenant-isolated and company timezone aware.
+ */
+export async function getAnalyticsData(timeRange: "30D" | "90D" | "YTD" | "ALL" = "YTD") {
+  try {
+    const session = await requireAuth();
+
+    const [company, invoices, financeRecords, customers, appointments, deals, tasks, products] = await Promise.all([
+      db.company.findUnique({
+        where: { id: session.companyId },
+        select: {
+          id: true,
+          name: true,
+          currency: true,
+          timezone: true,
+        },
+      }),
+      db.invoice.findMany({
+        where: { companyId: session.companyId },
+        orderBy: { issueDate: "asc" },
+      }),
+      db.financeRecord.findMany({
+        where: { companyId: session.companyId },
+        orderBy: { date: "asc" },
+      }),
+      db.customer.findMany({
+        where: { companyId: session.companyId },
+        orderBy: { createdAt: "asc" },
+      }),
+      db.appointment.findMany({
+        where: { companyId: session.companyId },
+        orderBy: { startTime: "asc" },
+      }),
+      db.deal.findMany({
+        where: { companyId: session.companyId },
+        orderBy: { createdAt: "asc" },
+      }),
+      db.task.findMany({
+        where: { companyId: session.companyId },
+        orderBy: { createdAt: "asc" },
+      }),
+      db.product.findMany({
+        where: { companyId: session.companyId },
+      }),
+    ]);
+
+    const companyTimezone = sanitizeTimezone(company?.timezone);
+    const companyCurrency = company?.currency || "USD";
+    const now = new Date();
+
+    // Determine time cutoff if applicable
+    let cutoffDate: Date | null = null;
+    if (timeRange === "30D") {
+      cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (timeRange === "90D") {
+      cutoffDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    } else if (timeRange === "YTD") {
+      const currentYearStr = formatInTimeZone(now, companyTimezone, "yyyy");
+      cutoffDate = fromZonedTime(`${currentYearStr}-01-01 00:00:00`, companyTimezone);
+    }
+
+    // Filter records in range
+    const filteredInvoices = cutoffDate
+      ? invoices.filter((i) => new Date(i.issueDate) >= cutoffDate! || (i.paidAt && new Date(i.paidAt) >= cutoffDate!))
+      : invoices;
+
+    const filteredFinance = cutoffDate
+      ? financeRecords.filter((f) => new Date(f.date) >= cutoffDate!)
+      : financeRecords;
+
+    const filteredDeals = cutoffDate
+      ? deals.filter((d) => new Date(d.createdAt) >= cutoffDate!)
+      : deals;
+
+    const filteredTasks = cutoffDate
+      ? tasks.filter((t) => new Date(t.createdAt) >= cutoffDate!)
+      : tasks;
+
+    // Invoices calculation
+    const effectiveInvoices = filteredInvoices.map((inv) => ({
+      ...inv,
+      effectiveStatus: getEffectiveInvoiceStatus(inv, companyTimezone),
+    }));
+
+    const paidInvoices = effectiveInvoices.filter((i) => i.effectiveStatus === "PAID");
+    const totalRealizedRevenue = roundMoney(paidInvoices.reduce((sum, i) => sum + i.totalAmount, 0));
+
+    // Settled expenses from FinanceRecords
+    const settledExpenses = roundMoney(
+      filteredFinance
+        .filter((f) => f.type === "EXPENSE" && f.status === "SETTLED")
+        .reduce((sum, f) => sum + f.amount, 0)
+    );
+
+    const netProfit = roundMoney(totalRealizedRevenue - settledExpenses);
+
+    // Customer LTV (Realized revenue divided by total customers)
+    const customerCount = customers.length;
+    const customerLtv = customerCount > 0 ? roundMoney(totalRealizedRevenue / customerCount) : 0;
+
+    // Deal conversion rate (WON deals / closed deals or total deals)
+    const wonDeals = filteredDeals.filter((d) => d.stage === "WON");
+    const lostDeals = filteredDeals.filter((d) => d.stage === "LOST");
+    const closedDealsCount = wonDeals.length + lostDeals.length;
+    const dealWinRate = closedDealsCount > 0
+      ? Math.round((wonDeals.length / closedDealsCount) * 100 * 10) / 10
+      : filteredDeals.length > 0
+      ? Math.round((wonDeals.length / filteredDeals.length) * 100 * 10) / 10
+      : 0;
+
+    // Task completion rate
+    const completedTasks = filteredTasks.filter((t) => t.status === "DONE");
+    const taskCompletionRate = filteredTasks.length > 0
+      ? Math.round((completedTasks.length / filteredTasks.length) * 100 * 10) / 10
+      : 0;
+
+    // Generate monthly timeline (past 6 months up to current month)
+    const monthsTimeline = Array.from({ length: 6 }, (_, idx) => {
+      const monthOffset = 5 - idx;
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 1);
+      const monthKey = formatInTimeZone(targetDate, companyTimezone, "yyyy-MM");
+      const monthLabel = formatInTimeZone(targetDate, companyTimezone, "MMM yyyy");
+
+      // Paid revenue in this month
+      const monthRevenue = roundMoney(
+        invoices
+          .filter((i) => {
+            if (i.status !== "PAID") return false;
+            const dateToUse = i.paidAt ? new Date(i.paidAt) : new Date(i.issueDate);
+            return formatInTimeZone(dateToUse, companyTimezone, "yyyy-MM") === monthKey;
+          })
+          .reduce((sum, i) => sum + i.totalAmount, 0)
+      );
+
+      // Expenses in this month
+      const monthExpenses = roundMoney(
+        financeRecords
+          .filter((f) => f.type === "EXPENSE" && formatInTimeZone(new Date(f.date), companyTimezone, "yyyy-MM") === monthKey)
+          .reduce((sum, f) => sum + f.amount, 0)
+      );
+
+      // New customers in this month
+      const monthCustomers = customers.filter(
+        (c) => formatInTimeZone(new Date(c.createdAt), companyTimezone, "yyyy-MM") === monthKey
+      ).length;
+
+      // Bookings in this month
+      const monthBookings = appointments.filter(
+        (a) => a.status !== "CANCELLED" && formatInTimeZone(new Date(a.startTime), companyTimezone, "yyyy-MM") === monthKey
+      ).length;
+
+      return {
+        month: monthLabel,
+        revenue: monthRevenue,
+        expenses: monthExpenses,
+        customers: monthCustomers,
+        bookings: monthBookings,
+      };
+    });
+
+    // Category / Channel Breakdown
+    const categoryMap = new Map<string, number>();
+    for (const record of filteredFinance) {
+      const cat = record.category || "General";
+      categoryMap.set(cat, roundMoney((categoryMap.get(cat) || 0) + record.amount));
+    }
+
+    let channelData = Array.from(categoryMap.entries()).map(([channel, value]) => ({
+      channel,
+      value,
+    }));
+
+    if (channelData.length === 0) {
+      const dealStageMap = new Map<string, number>();
+      for (const deal of filteredDeals) {
+        dealStageMap.set(deal.stage, roundMoney((dealStageMap.get(deal.stage) || 0) + deal.amount));
+      }
+      channelData = Array.from(dealStageMap.entries()).map(([channel, value]) => ({
+        channel: channel.replace(/_/g, " "),
+        value,
+      }));
+    }
+
+    // Pipeline & Inventory Metrics
+    const totalPipelineValue = roundMoney(
+      filteredDeals.filter((d) => d.stage !== "LOST").reduce((sum, d) => sum + d.amount, 0)
+    );
+    const totalInventoryValue = roundMoney(
+      products.reduce((sum, p) => sum + p.price * p.stock, 0)
+    );
+    const lowStockCount = products.filter((p) => p.stock <= p.minStockAlert).length;
+
+    return {
+      success: true,
+      timeRange,
+      currency: companyCurrency,
+      kpis: {
+        totalRealizedRevenue,
+        settledExpenses,
+        netProfit,
+        customerLtv,
+        dealWinRate,
+        taskCompletionRate,
+        totalCustomers: customers.length,
+        activeCustomers: customers.filter((c) => c.status !== "CHURNED").length,
+        totalAppointments: appointments.filter((a) => a.status !== "CANCELLED").length,
+        totalDeals: filteredDeals.length,
+        totalPipelineValue,
+        totalInventoryValue,
+        lowStockCount,
+      },
+      growthData: monthsTimeline,
+      channelData,
+    };
+  } catch (error: any) {
+    console.error("Error generating analytics data:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to retrieve analytics data",
+      code: error?.status || 500,
+    };
+  }
+}
+

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { Footer } from "@/components/layout/footer";
@@ -9,7 +9,7 @@ import { AIDrawer } from "@/components/ai/ai-drawer";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createNewCustomer, createNewTask } from "@/lib/actions";
+import { createNewCustomer, createNewTask, getShellData, type ShellData } from "@/lib/actions";
 
 export default function DashboardLayout({
   children,
@@ -20,6 +20,29 @@ export default function DashboardLayout({
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
+  const [shellData, setShellData] = useState<ShellData | null>(null);
+
+  const refreshShell = async () => {
+    try {
+      const res = await getShellData();
+      if (res.success && res.data) {
+        setShellData(res.data);
+      }
+    } catch {
+      // Graceful fallback on network glitch
+    }
+  };
+
+  useEffect(() => {
+    refreshShell();
+    const handleRefresh = () => refreshShell();
+    window.addEventListener("task-updated", handleRefresh);
+    window.addEventListener("shell-refresh", handleRefresh);
+    return () => {
+      window.removeEventListener("task-updated", handleRefresh);
+      window.removeEventListener("shell-refresh", handleRefresh);
+    };
+  }, []);
 
   // Quick Action form state
   const [quickType, setQuickType] = useState<"customer" | "task">("customer");
@@ -33,6 +56,7 @@ export default function DashboardLayout({
       await createNewCustomer({ name: title, email, companyName: company });
     } else {
       await createNewTask({ title, priority: "HIGH" });
+      await refreshShell();
     }
     setIsQuickActionOpen(false);
     setTitle("");
@@ -47,6 +71,7 @@ export default function DashboardLayout({
         isCollapsed={isCollapsed}
         onToggle={() => setIsCollapsed(!isCollapsed)}
         onOpenAI={() => setIsAIOpen(true)}
+        openTaskCount={shellData?.openTaskCount}
       />
 
       {/* Main Container */}
@@ -55,6 +80,7 @@ export default function DashboardLayout({
         <Topbar
           onOpenCommand={() => setIsCommandOpen(true)}
           onOpenQuickAction={() => setIsQuickActionOpen(true)}
+          shellData={shellData}
         />
 
         {/* Dynamic Page Content */}
@@ -97,7 +123,7 @@ export default function DashboardLayout({
                   : "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
               }`}
             >
-              + New Lead
+              + New Customer
             </button>
             <button
               type="button"

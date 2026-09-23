@@ -26,6 +26,7 @@ interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   onOpenAI: () => void;
+  openTaskCount?: number;
 }
 
 const navItems = [
@@ -34,7 +35,7 @@ const navItems = [
   { label: "Invoices", href: "/invoices", icon: FileText },
   { label: "Bookings", href: "/bookings", icon: Calendar },
   { label: "Employees", href: "/employees", icon: UserCheck },
-  { label: "Tasks", href: "/tasks", icon: CheckSquare, badge: "5" },
+  { label: "Tasks", href: "/tasks", icon: CheckSquare },
   { label: "Inventory", href: "/inventory", icon: Package },
   { label: "Finance", href: "/finance", icon: DollarSign },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
@@ -42,7 +43,7 @@ const navItems = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-export function Sidebar({ isCollapsed, onToggle, onOpenAI }: SidebarProps) {
+export function Sidebar({ isCollapsed, onToggle, onOpenAI, openTaskCount }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -90,6 +91,10 @@ export function Sidebar({ isCollapsed, onToggle, onOpenAI }: SidebarProps) {
               ? pathname === "/"
               : pathname.startsWith(item.href);
           const Icon = item.icon;
+          const dynamicBadge =
+            item.href === "/tasks" && typeof openTaskCount === "number" && openTaskCount > 0
+              ? String(openTaskCount)
+              : undefined;
 
           return (
             <Link
@@ -114,7 +119,7 @@ export function Sidebar({ isCollapsed, onToggle, onOpenAI }: SidebarProps) {
               {!isCollapsed && (
                 <span className="flex-1 truncate">{item.label}</span>
               )}
-              {!isCollapsed && item.badge && (
+              {!isCollapsed && dynamicBadge && (
                 <span
                   className={cn(
                     "px-1.5 py-0.5 text-[10px] font-bold rounded-full",
@@ -123,7 +128,7 @@ export function Sidebar({ isCollapsed, onToggle, onOpenAI }: SidebarProps) {
                       : "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
                   )}
                 >
-                  {item.badge}
+                  {dynamicBadge}
                 </span>
               )}
             </Link>

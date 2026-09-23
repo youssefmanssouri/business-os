@@ -214,9 +214,9 @@ export type DealUpdateInput = z.infer<typeof dealUpdateSchema>;
 export const taskCreateSchema = z.object({
   title: z
     .string({ required_error: "Task title is required" })
-    .min(1, "Title cannot be empty")
-    .max(200, "Title cannot exceed 200 characters")
-    .trim(),
+    .trim()
+    .min(2, "Title must be at least 2 characters")
+    .max(200, "Title cannot exceed 200 characters"),
   description: z
     .string()
     .max(2000, "Description cannot exceed 2000 characters")
@@ -226,12 +226,33 @@ export const taskCreateSchema = z.object({
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"], {
     errorMap: () => ({ message: "Priority must be LOW, MEDIUM, HIGH, or URGENT" }),
   }),
+  status: z
+    .enum(["TODO", "IN_PROGRESS", "REVIEW", "DONE"], {
+      errorMap: () => ({ message: "Status must be TODO, IN_PROGRESS, REVIEW, or DONE" }),
+    })
+    .optional()
+    .default("TODO"),
   tags: z
     .string()
     .max(100, "Tags cannot exceed 100 characters")
     .trim()
     .optional()
     .or(z.literal("")),
+  assigneeId: z
+    .string()
+    .max(100, "Assignee ID is too long")
+    .trim()
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  dueDate: z
+    .string()
+    .optional()
+    .nullable()
+    .or(z.literal(""))
+    .refine((val) => !val || !isNaN(Date.parse(val)), {
+      message: "Invalid due date format",
+    }),
 });
 
 export type TaskCreateInput = z.infer<typeof taskCreateSchema>;
@@ -247,6 +268,15 @@ export const taskUpdateStatusSchema = z.object({
 });
 
 export type TaskUpdateStatusInput = z.infer<typeof taskUpdateStatusSchema>;
+
+export const taskDeleteSchema = z.object({
+  taskId: z
+    .string({ required_error: "Task ID is required" })
+    .min(1, "Task ID cannot be empty")
+    .max(100, "Invalid Task ID length"),
+});
+
+export type TaskDeleteInput = z.infer<typeof taskDeleteSchema>;
 
 /**
  * Invoice Validation Schemas
@@ -603,3 +633,378 @@ export const serviceUpdateSchema = z.object({
 });
 
 export type ServiceUpdateInput = z.infer<typeof serviceUpdateSchema>;
+
+/**
+ * Product / Inventory Validation Schemas
+ */
+export const productCreateSchema = z.object({
+  name: z
+    .string({ required_error: "Product name is required" })
+    .trim()
+    .min(2, "Product name must be at least 2 characters")
+    .max(150, "Product name cannot exceed 150 characters"),
+  sku: z
+    .string({ required_error: "SKU is required" })
+    .trim()
+    .min(2, "SKU must be at least 2 characters")
+    .max(50, "SKU cannot exceed 50 characters")
+    .toUpperCase(),
+  category: z
+    .string()
+    .trim()
+    .min(1, "Category cannot be empty")
+    .max(50, "Category cannot exceed 50 characters")
+    .default("Hardware"),
+  price: z
+    .number({ required_error: "Price is required" })
+    .min(0, "Price cannot be negative")
+    .max(10000000, "Price exceeds maximum allowed limit"),
+  cost: z
+    .number()
+    .min(0, "Cost cannot be negative")
+    .max(10000000, "Cost exceeds maximum allowed limit")
+    .optional(),
+  stock: z
+    .number()
+    .int("Stock must be an integer")
+    .min(0, "Stock cannot be negative")
+    .max(1000000, "Stock cannot exceed 1,000,000")
+    .default(0),
+  minStockAlert: z
+    .number()
+    .int("Minimum stock alert must be an integer")
+    .min(0, "Minimum stock alert cannot be negative")
+    .max(10000, "Minimum stock alert cannot exceed 10,000")
+    .default(5),
+  supplier: z
+    .string()
+    .max(100, "Supplier name cannot exceed 100 characters")
+    .trim()
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  barcode: z
+    .string()
+    .max(50, "Barcode cannot exceed 50 characters")
+    .trim()
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+});
+
+export type ProductCreateInput = z.infer<typeof productCreateSchema>;
+
+export const productUpdateSchema = z.object({
+  productId: z
+    .string({ required_error: "Product ID is required" })
+    .min(1, "Product ID cannot be empty"),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Product name must be at least 2 characters")
+    .max(150, "Product name cannot exceed 150 characters")
+    .optional(),
+  sku: z
+    .string()
+    .trim()
+    .min(2, "SKU must be at least 2 characters")
+    .max(50, "SKU cannot exceed 50 characters")
+    .toUpperCase()
+    .optional(),
+  category: z
+    .string()
+    .trim()
+    .min(1, "Category cannot be empty")
+    .max(50, "Category cannot exceed 50 characters")
+    .optional(),
+  price: z
+    .number()
+    .min(0, "Price cannot be negative")
+    .max(10000000, "Price exceeds maximum allowed limit")
+    .optional(),
+  cost: z
+    .number()
+    .min(0, "Cost cannot be negative")
+    .max(10000000, "Cost exceeds maximum allowed limit")
+    .optional(),
+  stock: z
+    .number()
+    .int("Stock must be an integer")
+    .min(0, "Stock cannot be negative")
+    .max(1000000, "Stock cannot exceed 1,000,000")
+    .optional(),
+  minStockAlert: z
+    .number()
+    .int("Minimum stock alert must be an integer")
+    .min(0, "Minimum stock alert cannot be negative")
+    .max(10000, "Minimum stock alert cannot exceed 10,000")
+    .optional(),
+  supplier: z
+    .string()
+    .max(100, "Supplier name cannot exceed 100 characters")
+    .trim()
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  barcode: z
+    .string()
+    .max(50, "Barcode cannot exceed 50 characters")
+    .trim()
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+});
+
+export type ProductUpdateInput = z.infer<typeof productUpdateSchema>;
+
+export const productDeleteSchema = z.object({
+  productId: z
+    .string({ required_error: "Product ID is required" })
+    .min(1, "Product ID cannot be empty"),
+});
+
+export type ProductDeleteInput = z.infer<typeof productDeleteSchema>;
+
+/**
+ * Employee Validation Schemas
+ */
+export const employeeCreateSchema = z.object({
+  name: z
+    .string({ required_error: "Employee name is required" })
+    .trim()
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name cannot exceed 100 characters"),
+  email: z
+    .string({ required_error: "Email is required" })
+    .trim()
+    .email("Invalid email format")
+    .toLowerCase(),
+  role: z.enum(["ADMIN", "MANAGER", "EMPLOYEE"], {
+    errorMap: () => ({ message: "Role must be ADMIN, MANAGER, or EMPLOYEE" }),
+  }).default("EMPLOYEE"),
+  department: z
+    .string()
+    .max(100, "Department cannot exceed 100 characters")
+    .trim()
+    .optional()
+    .default("General"),
+  title: z
+    .string()
+    .max(100, "Job title cannot exceed 100 characters")
+    .trim()
+    .optional()
+    .default("Staff Specialist"),
+  phone: z
+    .string()
+    .max(30, "Phone number cannot exceed 30 characters")
+    .trim()
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  status: z.enum(["ACTIVE", "ON_LEAVE", "INACTIVE"], {
+    errorMap: () => ({ message: "Status must be ACTIVE, ON_LEAVE, or INACTIVE" }),
+  }).default("ACTIVE"),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .optional(),
+});
+
+export type EmployeeCreateInput = z.infer<typeof employeeCreateSchema>;
+
+export const employeeUpdateSchema = z.object({
+  employeeId: z
+    .string({ required_error: "Employee ID is required" })
+    .min(1, "Employee ID cannot be empty"),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name cannot exceed 100 characters")
+    .optional(),
+  role: z.enum(["ADMIN", "MANAGER", "EMPLOYEE"], {
+    errorMap: () => ({ message: "Role must be ADMIN, MANAGER, or EMPLOYEE" }),
+  }).optional(),
+  department: z
+    .string()
+    .max(100, "Department cannot exceed 100 characters")
+    .trim()
+    .optional(),
+  title: z
+    .string()
+    .max(100, "Job title cannot exceed 100 characters")
+    .trim()
+    .optional(),
+  phone: z
+    .string()
+    .max(30, "Phone number cannot exceed 30 characters")
+    .trim()
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  status: z.enum(["ACTIVE", "ON_LEAVE", "INACTIVE"], {
+    errorMap: () => ({ message: "Status must be ACTIVE, ON_LEAVE, or INACTIVE" }),
+  }).optional(),
+});
+
+export type EmployeeUpdateInput = z.infer<typeof employeeUpdateSchema>;
+
+/**
+ * Finance Validation Schemas
+ */
+export const financeRecordCreateSchema = z.object({
+  type: z.enum(["REVENUE", "EXPENSE"], {
+    errorMap: () => ({ message: "Type must be REVENUE or EXPENSE" }),
+  }),
+  category: z
+    .string({ required_error: "Category is required" })
+    .trim()
+    .min(1, "Category cannot be empty")
+    .max(100, "Category cannot exceed 100 characters"),
+  amount: z
+    .number({ required_error: "Amount is required" })
+    .positive("Amount must be greater than 0")
+    .max(100000000, "Amount exceeds maximum limit"),
+  date: z
+    .string()
+    .optional()
+    .nullable()
+    .or(z.literal(""))
+    .refine((val) => !val || !isNaN(Date.parse(val)), {
+      message: "Invalid transaction date format",
+    }),
+  description: z
+    .string({ required_error: "Description is required" })
+    .trim()
+    .min(1, "Description cannot be empty")
+    .max(500, "Description cannot exceed 500 characters"),
+  status: z.enum(["SETTLED", "PENDING"], {
+    errorMap: () => ({ message: "Status must be SETTLED or PENDING" }),
+  }).default("SETTLED"),
+});
+
+export type FinanceRecordCreateInput = z.infer<typeof financeRecordCreateSchema>;
+
+export const financeRecordUpdateSchema = z.object({
+  recordId: z
+    .string({ required_error: "Record ID is required" })
+    .min(1, "Record ID cannot be empty"),
+  type: z.enum(["REVENUE", "EXPENSE"]).optional(),
+  category: z
+    .string()
+    .trim()
+    .min(1, "Category cannot be empty")
+    .max(100, "Category cannot exceed 100 characters")
+    .optional(),
+  amount: z
+    .number()
+    .positive("Amount must be greater than 0")
+    .max(100000000, "Amount exceeds maximum limit")
+    .optional(),
+  date: z
+    .string()
+    .optional()
+    .nullable()
+    .or(z.literal(""))
+    .refine((val) => !val || !isNaN(Date.parse(val)), {
+      message: "Invalid transaction date format",
+    }),
+  description: z
+    .string()
+    .trim()
+    .min(1, "Description cannot be empty")
+    .max(500, "Description cannot exceed 500 characters")
+    .optional(),
+  status: z.enum(["SETTLED", "PENDING"]).optional(),
+});
+
+export type FinanceRecordUpdateInput = z.infer<typeof financeRecordUpdateSchema>;
+
+export const financeRecordDeleteSchema = z.object({
+  recordId: z
+    .string({ required_error: "Record ID is required" })
+    .min(1, "Record ID cannot be empty"),
+});
+
+export type FinanceRecordDeleteInput = z.infer<typeof financeRecordDeleteSchema>;
+
+/**
+ * Document Validation Schemas
+ */
+export const documentCreateSchema = z.object({
+  name: z
+    .string({ required_error: "Document name is required" })
+    .trim()
+    .min(2, "Document name must be at least 2 characters")
+    .max(150, "Document name cannot exceed 150 characters"),
+  category: z
+    .string({ required_error: "Category is required" })
+    .trim()
+    .min(1, "Category cannot be empty")
+    .max(50, "Category cannot exceed 50 characters")
+    .default("General"),
+  size: z
+    .string()
+    .max(20, "Size string cannot exceed 20 characters")
+    .trim()
+    .optional()
+    .default("1.5 MB"),
+  url: z
+    .string()
+    .max(500, "URL cannot exceed 500 characters")
+    .trim()
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  mimeType: z
+    .string()
+    .max(100, "MIME type cannot exceed 100 characters")
+    .trim()
+    .optional()
+    .default("application/pdf"),
+  tags: z
+    .string()
+    .max(100, "Tags cannot exceed 100 characters")
+    .trim()
+    .optional()
+    .default("General"),
+});
+
+export type DocumentCreateInput = z.infer<typeof documentCreateSchema>;
+
+export const documentUpdateSchema = z.object({
+  documentId: z
+    .string({ required_error: "Document ID is required" })
+    .min(1, "Document ID cannot be empty"),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Document name must be at least 2 characters")
+    .max(150, "Document name cannot exceed 150 characters")
+    .optional(),
+  category: z
+    .string()
+    .trim()
+    .min(1, "Category cannot be empty")
+    .max(50, "Category cannot exceed 50 characters")
+    .optional(),
+  tags: z
+    .string()
+    .max(100, "Tags cannot exceed 100 characters")
+    .trim()
+    .optional(),
+});
+
+export type DocumentUpdateInput = z.infer<typeof documentUpdateSchema>;
+
+export const documentDeleteSchema = z.object({
+  documentId: z
+    .string({ required_error: "Document ID is required" })
+    .min(1, "Document ID cannot be empty"),
+});
+
+export type DocumentDeleteInput = z.infer<typeof documentDeleteSchema>;
+
+
+
+

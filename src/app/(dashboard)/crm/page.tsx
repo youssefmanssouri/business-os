@@ -672,16 +672,17 @@ export default function CRMPage() {
               onAction={() => setSearchTerm("")}
             />
           ) : viewMode === "kanban" ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-5 overflow-x-auto pb-4">
-              {STAGES.map((stage) => {
-                const stageDeals = filteredDeals.filter((d) => d.stage === stage.id);
-                const stageTotal = stageDeals.reduce((sum, d) => sum + d.amount, 0);
+            <div className="overflow-x-auto pb-4 -mx-1 px-1">
+              <div className="flex gap-4 min-w-[1380px] w-full">
+                {STAGES.map((stage) => {
+                  const stageDeals = filteredDeals.filter((d) => d.stage === stage.id);
+                  const stageTotal = stageDeals.reduce((sum, d) => sum + d.amount, 0);
 
-                return (
-                  <div
-                    key={stage.id}
-                    className="flex flex-col rounded-2xl border border-neutral-200/80 bg-neutral-50/70 p-3 dark:border-neutral-800/80 dark:bg-neutral-900/40 min-w-[250px]"
-                  >
+                  return (
+                    <div
+                      key={stage.id}
+                      className="flex-1 flex flex-col rounded-2xl border border-neutral-200/80 bg-neutral-50/70 p-3 dark:border-neutral-800/80 dark:bg-neutral-900/40 min-w-[260px]"
+                    >
                     {/* Stage Header */}
                     <div className="flex items-center justify-between pb-3 border-b border-neutral-200/60 dark:border-neutral-800/60">
                       <div className="flex items-center gap-2">
@@ -767,6 +768,7 @@ export default function CRMPage() {
                   </div>
                 );
               })}
+              </div>
             </div>
           ) : (
             /* Table View */
