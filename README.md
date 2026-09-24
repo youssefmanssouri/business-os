@@ -12,11 +12,12 @@
 
 ---
 
-## 🌐 Live Access
+## 🌐 Live Access & Product Case Study
 
 - **Live Product Demo**: [https://business-os-manssouri.vercel.app](https://business-os-manssouri.vercel.app)
-- **Engineering Case Study**: [https://www.youssefmanssouri.site/projects/businessos](https://www.youssefmanssouri.site/projects/businessos)
-- *Note: The live demo runs in a protected read-only environment with synthetic data to protect database integrity.*
+- **Portfolio Case Study**: [https://www.youssefmanssouri.site/projects/businessos](https://www.youssefmanssouri.site/projects/businessos)
+- **Detailed Technical Case Study**: [docs/CASE_STUDY.md](docs/CASE_STUDY.md)
+- *Production Deployment: Fully persistent, database-backed multi-tenant SaaS workspace with tenant isolation, verified RBAC, and 540/540 automated tests passing.*
 
 ---
 
@@ -41,7 +42,7 @@ Small and growing businesses frequently operate across a fragmented stack of dis
 
 ## 🏗️ Architecture
 
-`	ext
+```text
 Browser Client (React 19 / Tailwind CSS)
                │
                ▼
@@ -55,7 +56,7 @@ Browser Client (React 19 / Tailwind CSS)
                │
                ▼
    PostgreSQL / SQLite (Relational Database Schema)
-`
+```
 
 ---
 
