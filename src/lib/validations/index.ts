@@ -18,6 +18,34 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
+export const registerSchema = z
+  .object({
+    name: z
+      .string({ required_error: "Full name is required" })
+      .trim()
+      .min(2, "Full name must be at least 2 characters")
+      .max(100, "Full name cannot exceed 100 characters"),
+    email: z
+      .string({ required_error: "Email is required" })
+      .trim()
+      .email("Please provide a valid email address")
+      .max(120, "Email cannot exceed 120 characters")
+      .toLowerCase(),
+    password: z
+      .string({ required_error: "Password is required" })
+      .min(8, "Password must be at least 8 characters")
+      .max(100, "Password cannot exceed 100 characters"),
+    confirmPassword: z
+      .string({ required_error: "Confirm password is required" })
+      .min(1, "Please confirm your password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+export type RegisterInput = z.infer<typeof registerSchema>;
+
 /**
  * Customer / CRM Validation Schemas
  */

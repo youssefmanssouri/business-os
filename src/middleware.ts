@@ -36,13 +36,15 @@ export async function middleware(request: NextRequest) {
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const isAuthenticated = sessionCookie ? await verifyToken(sessionCookie) : false;
 
-  // 1. If trying to access login page while already authenticated, redirect to dashboard
-  if (pathname === "/login" && isAuthenticated) {
+  const isAuthRoute = pathname === "/login" || pathname === "/register";
+
+  // 1. If trying to access auth pages while already authenticated, redirect to dashboard
+  if (isAuthRoute && isAuthenticated) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // 2. Allow access to login page for unauthenticated users
-  if (pathname === "/login") {
+  // 2. Allow access to auth pages for unauthenticated users
+  if (isAuthRoute) {
     return NextResponse.next();
   }
 

@@ -32,6 +32,7 @@ import {
 } from "@/lib/auth";
 import {
   loginSchema,
+  registerSchema,
   customerCreateSchema,
   customerUpdateSchema,
   dealCreateSchema,
@@ -72,6 +73,7 @@ export async function loginAction(rawInput: unknown) {
       return {
         success: false,
         error: parseResult.error.errors[0]?.message || "Invalid input",
+        errors: parseResult.error.flatten().fieldErrors,
         code: 400,
       };
     }
@@ -140,6 +142,128 @@ export async function loginAction(rawInput: unknown) {
     return {
       success: false,
       error: detail || "An unexpected authentication error occurred. Please try again.",
+      code: 500,
+    };
+  }
+}
+
+/**
+ * Authentication Action: Creates a new user account and associated company workspace,
+ * sets secure session cookie, and returns authenticated user info.
+ */
+export async function registerAction(rawInput: unknown) {
+  try {
+    const parseResult = registerSchema.safeParse(rawInput);
+    if (!parseResult.success) {
+      return {
+        success: false,
+        error: parseResult.error.errors[0]?.message || "Invalid input",
+        errors: parseResult.error.flatten().fieldErrors,
+        code: 400,
+      };
+    }
+
+    const { name, email, password } = parseResult.data;
+
+    // Check if email already registered across system
+    const existingUser = await db.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return {
+        success: false,
+        error: "An account with this email address already exists. Please sign in instead.",
+        code: 409,
+      };
+    }
+
+    // Generate unique slug for the user's company workspace
+    const baseSlug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "") || "workspace";
+    const uniqueSuffix = Math.random().toString(36).substring(2, 7);
+    const slug = `${baseSlug}-${uniqueSuffix}`;
+    const companyName = `${name}'s Workspace`;
+
+    // Hash password with bcrypt
+    const passwordHash = await hashPassword(password);
+
+    // Create Company and User
+    const newCompany = await db.company.create({
+      data: {
+        name: companyName,
+        slug,
+        plan: "PRO",
+        currency: "USD",
+        timezone: "America/New_York",
+      },
+    });
+
+    const newUser = await db.user.create({
+      data: {
+        companyId: newCompany.id,
+        email,
+        name,
+        passwordHash,
+        role: "ADMIN",
+        status: "ACTIVE",
+        title: "Owner / Administrator",
+        department: "Executive Leadership",
+      },
+    });
+
+    // Initialize AI settings for the workspace
+    await db.aISetting.create({
+      data: {
+        companyId: newCompany.id,
+        isEnabled: true,
+        autoDraftEmails: true,
+        autoSummarizeInvoices: true,
+        insightsFrequency: "DAILY",
+      },
+    });
+
+    // Log creation in ActivityLog
+    await db.activityLog.create({
+      data: {
+        companyId: newCompany.id,
+        action: "ACCOUNT_CREATED",
+        category: "SYSTEM",
+        description: `Workspace created for ${name} (${email}).`,
+        actorName: name,
+      },
+    });
+
+    // Generate signed JWT session token
+    const token = await createSessionToken({
+      userId: newUser.id,
+      companyId: newCompany.id,
+      role: "ADMIN",
+      email: newUser.email,
+      name: newUser.name,
+    });
+
+    // Set secure HTTP-only cookie
+    await setSessionCookie(token);
+
+    return {
+      success: true,
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        companyName: newCompany.name,
+      },
+    };
+  } catch (error: any) {
+    console.error("Register action error:", error);
+    const detail = error?.message && typeof error.message === "string" ? error.message : "";
+    return {
+      success: false,
+      error: detail || "An unexpected registration error occurred. Please try again.",
       code: 500,
     };
   }
