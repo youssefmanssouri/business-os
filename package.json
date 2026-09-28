@@ -3,13 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
+    "dev": "node scripts/sync-database-provider.js && next dev",
+    "build": "node scripts/sync-database-provider.js && prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
-    "postinstall": "prisma generate"
+    "test": "node scripts/run-all-tests.js",
+    "db:push": "node scripts/sync-database-provider.js && prisma db push",
+    "db:seed": "node scripts/sync-database-provider.js && tsx prisma/seed.ts",
+    "postinstall": "node scripts/sync-database-provider.js && prisma generate"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
