@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Tabs } from "@/components/ui/tabs";
 import {
   Building2,
-  Sparkles,
   ShieldCheck,
   DollarSign,
   Save,
@@ -42,11 +41,6 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [taxId, setTaxId] = useState("");
   const [registrationId, setRegistrationId] = useState("");
-
-  // AI Modules State (Client preferences)
-  const [aiEnabled, setAiEnabled] = useState(true);
-  const [autoEmail, setAutoEmail] = useState(true);
-  const [autoInvoice, setAutoInvoice] = useState(true);
 
   useEffect(() => {
     async function loadSettings() {
@@ -190,7 +184,6 @@ export default function SettingsPage() {
         tabs={[
           { id: "branding", label: "Company Profile" },
           { id: "financials", label: "Taxes & Currencies" },
-          { id: "ai", label: "Modular AI Features" },
           { id: "security", label: "Security & RBAC" },
         ]}
         activeTab={activeTab}
@@ -372,63 +365,6 @@ export default function SettingsPage() {
               </p>
             </div>
           </form>
-        </Card>
-      )}
-
-      {/* Modular AI Features Tab */}
-      {activeTab === "ai" && (
-        <Card className="p-6 space-y-6">
-          <div className="flex items-center justify-between border-b border-neutral-100 pb-4 dark:border-neutral-800">
-            <div>
-              <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-500" />
-                Modular BusinessOS Copilot
-              </h3>
-              <p className="text-xs text-neutral-500 mt-1">
-                Toggle AI modules on or off without affecting core application functionality.
-              </p>
-            </div>
-            <button
-              onClick={() => setAiEnabled(!aiEnabled)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                aiEnabled ? "bg-emerald-600 text-white" : "bg-neutral-200 text-neutral-700 dark:bg-neutral-800"
-              }`}
-            >
-              {aiEnabled ? "AI Active" : "AI Disabled"}
-            </button>
-          </div>
-
-          <div className="space-y-4 max-w-xl">
-            <div className="flex items-center justify-between p-3 rounded-xl border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
-              <div>
-                <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                  AI Invoice Auto-Summarizer
-                </div>
-                <div className="text-[11px] text-neutral-500">Automatically generate summaries for incoming PDF invoices.</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={autoInvoice}
-                onChange={() => setAutoInvoice(!autoInvoice)}
-                className="h-4 w-4 rounded text-neutral-900"
-              />
-            </div>
-
-            <div className="flex items-center justify-between p-3 rounded-xl border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
-              <div>
-                <div className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                  AI Smart Email Drafter
-                </div>
-                <div className="text-[11px] text-neutral-500">Draft context-aware proposal emails for CRM leads.</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={autoEmail}
-                onChange={() => setAutoEmail(!autoEmail)}
-                className="h-4 w-4 rounded text-neutral-900"
-              />
-            </div>
-          </div>
         </Card>
       )}
 

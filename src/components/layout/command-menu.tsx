@@ -16,17 +16,15 @@ import {
   BarChart3,
   FolderArchive,
   Settings,
-  Sparkles,
   ArrowRight,
 } from "lucide-react";
 
 interface CommandMenuProps {
   isOpen: boolean;
   onClose: () => void;
-  onOpenAI: () => void;
 }
 
-export function CommandMenu({ isOpen, onClose, onOpenAI }: CommandMenuProps) {
+export function CommandMenu({ isOpen, onClose }: CommandMenuProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
 
@@ -41,7 +39,7 @@ export function CommandMenu({ isOpen, onClose, onOpenAI }: CommandMenuProps) {
     { label: "Finance & Profit/Loss", href: "/finance", icon: DollarSign, category: "Navigation" },
     { label: "Interactive Analytics", href: "/analytics", icon: BarChart3, category: "Navigation" },
     { label: "Document Vault", href: "/documents", icon: FolderArchive, category: "Navigation" },
-    { label: "Company & AI Settings", href: "/settings", icon: Settings, category: "Navigation" },
+    { label: "Company Settings", href: "/settings", icon: Settings, category: "Navigation" },
   ];
 
   const filteredCommands = commands.filter((c) =>
@@ -77,23 +75,6 @@ export function CommandMenu({ isOpen, onClose, onOpenAI }: CommandMenuProps) {
           autoFocus
           className="rounded-xl bg-neutral-50 dark:bg-neutral-800"
         />
-
-        {/* AI Action Shortcut */}
-        <button
-          onClick={() => {
-            onClose();
-            onOpenAI();
-          }}
-          className="flex w-full items-center justify-between rounded-xl p-3 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 hover:border-indigo-500/40 transition-all text-xs font-semibold"
-        >
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="h-4 w-4 text-indigo-600 animate-pulse" />
-            <span>Ask BusinessOS AI Copilot</span>
-          </div>
-          <kbd className="rounded border border-indigo-300 bg-white/60 px-1.5 py-0.5 text-[10px] font-mono font-medium">
-            AI
-          </kbd>
-        </button>
 
         {/* Command List */}
         <div className="max-h-64 overflow-y-auto space-y-1">

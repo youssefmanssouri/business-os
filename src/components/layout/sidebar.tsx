@@ -16,7 +16,6 @@ import {
   BarChart3,
   FolderArchive,
   Settings,
-  Sparkles,
   ChevronLeft,
   ChevronRight,
   Zap,
@@ -25,7 +24,6 @@ import {
 interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
-  onOpenAI: () => void;
   openTaskCount?: number;
 }
 
@@ -43,7 +41,7 @@ const navItems = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-export function Sidebar({ isCollapsed, onToggle, onOpenAI, openTaskCount }: SidebarProps) {
+export function Sidebar({ isCollapsed, onToggle, openTaskCount }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -135,20 +133,6 @@ export function Sidebar({ isCollapsed, onToggle, onOpenAI, openTaskCount }: Side
           );
         })}
       </nav>
-
-      {/* Modular AI Action Tile */}
-      <div className="p-2 border-t border-neutral-200/60 dark:border-neutral-800/60">
-        <button
-          onClick={onOpenAI}
-          className={cn(
-            "w-full flex items-center gap-2.5 rounded-xl p-2.5 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 border border-indigo-500/20 text-indigo-700 dark:text-indigo-300 hover:border-indigo-500/40 transition-all text-xs font-semibold",
-            isCollapsed && "justify-center p-2"
-          )}
-        >
-          <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400 animate-pulse shrink-0" />
-          {!isCollapsed && <span>AI Copilot</span>}
-        </button>
-      </div>
     </aside>
   );
 }

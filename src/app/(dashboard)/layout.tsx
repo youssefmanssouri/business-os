@@ -5,7 +5,6 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { Footer } from "@/components/layout/footer";
 import { CommandMenu } from "@/components/layout/command-menu";
-import { AIDrawer } from "@/components/ai/ai-drawer";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +17,6 @@ export default function DashboardLayout({
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
-  const [isAIOpen, setIsAIOpen] = useState(false);
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const [shellData, setShellData] = useState<ShellData | null>(null);
 
@@ -70,7 +68,6 @@ export default function DashboardLayout({
       <Sidebar
         isCollapsed={isCollapsed}
         onToggle={() => setIsCollapsed(!isCollapsed)}
-        onOpenAI={() => setIsAIOpen(true)}
         openTaskCount={shellData?.openTaskCount}
       />
 
@@ -96,12 +93,6 @@ export default function DashboardLayout({
       <CommandMenu
         isOpen={isCommandOpen}
         onClose={() => setIsCommandOpen(false)}
-        onOpenAI={() => setIsAIOpen(true)}
-      />
-
-      <AIDrawer
-        isOpen={isAIOpen}
-        onClose={() => setIsAIOpen(false)}
       />
 
       {/* Quick Action Dialog */}
