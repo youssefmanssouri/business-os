@@ -25,11 +25,11 @@ BusinessOS is a multi-tenant business operations platform that unifies CRM deal 
 
 | Module View | Operational Focus | Suggested Screenshot Asset |
 |-------------|-------------------|----------------------------|
-| **Executive Dashboard** | Real-time MRR/revenue indicators, receivables, upcoming schedules in local timezone, and revenue velocity charts | `docs/screenshots/dashboard.png` *(pending capture)* |
-| **CRM Deal Pipeline** | Multi-stage deal progression (Kanban & Table), lead scoring, customer contact records, and win-rate metrics | `docs/screenshots/crm-pipeline.png` *(pending capture)* |
-| **Invoice Builder** | Dynamic line-item calculation, sales tax adjustment, status tracking (Paid, Pending, Overdue), and printable receipts | `docs/screenshots/invoices.png` *(pending capture)* |
-| **Booking Calendar** | Resource scheduling, staff capacity planning, service interval enforcement, and IANA timezone handling | `docs/screenshots/bookings.png` *(pending capture)* |
-| **Financial Ledger** | Income vs. expense classification, settled state toggles, and net profit telemetry | `docs/screenshots/finance.png` *(pending capture)* |
+| **Executive Dashboard** | Real-time MRR/revenue indicators, receivables, upcoming schedules in local timezone, and revenue velocity charts | ![Executive Dashboard](screenshots/businessos/dashboard.png) |
+| **CRM Deal Pipeline** | Multi-stage deal progression (Kanban & Table), lead scoring, customer contact records, and win-rate metrics | ![CRM Deal Pipeline](screenshots/businessos/crm-pipeline.png) |
+| **Invoice Builder** | Dynamic line-item calculation, sales tax adjustment, status tracking (Paid, Pending, Overdue), and printable receipts | ![Invoice Builder](screenshots/businessos/invoices.png) |
+| **Booking Calendar** | Resource scheduling, staff capacity planning, service interval enforcement, and IANA timezone handling | ![Booking Calendar](screenshots/businessos/bookings.png) |
+| **Financial Ledger** | Income vs. expense classification, settled state toggles, and net profit telemetry | ![Financial Ledger](screenshots/businessos/finance.png) |
 
 ---
 
