@@ -3183,29 +3183,58 @@ export async function updateInvoiceStatus(rawInput: unknown) {
     const isTransitionToPaid = status === "PAID";
     const paidAt = isTransitionToPaid ? (existing.paidAt ?? new Date()) : existing.paidAt;
 
-    const updatedInvoice = await db.invoice.update({
-      where: { id: existing.id },
-      data: {
-        status,
-        invoiceNumber: targetInvoiceNumber,
-        ...(isTransitionToPaid ? { paidAt } : {}),
-      },
-      include: { customer: true, items: true },
+    const updatedInvoice = await db.$transaction(async (tx) => {
+      const inv = await tx.invoice.update({
+        where: { id: existing.id },
+        data: {
+          status,
+          invoiceNumber: targetInvoiceNumber,
+          ...(isTransitionToPaid ? { paidAt } : {}),
+        },
+        include: { customer: true, items: true },
+      });
+
+      if (isTransitionToPaid) {
+        // Idempotency check: verify if a FinanceRecord already exists for this tenant & official invoice number
+        const existingRecord = await tx.financeRecord.findFirst({
+          where: {
+            companyId: session.companyId,
+            description: { contains: targetInvoiceNumber },
+          },
+        });
+
+        if (!existingRecord) {
+          await tx.financeRecord.create({
+            data: {
+              companyId: session.companyId,
+              type: "REVENUE",
+              category: "Invoicing",
+              amount: existing.totalAmount,
+              date: paidAt!,
+              description: `Invoice ${targetInvoiceNumber} payment - ${existing.customer?.name || "Customer"}`,
+              status: "SETTLED",
+            },
+          });
+        }
+      }
+
+      const isIssuing = existing.status === "DRAFT" && status === "PENDING";
+      await tx.activityLog.create({
+        data: {
+          companyId: session.companyId,
+          action: isIssuing ? "INVOICE_ISSUED" : isTransitionToPaid ? "INVOICE_PAID" : "INVOICE_STATUS_CHANGED",
+          category: "FINANCE",
+          description: isIssuing
+            ? `Draft invoice ${existing.invoiceNumber} finalized and issued as ${targetInvoiceNumber} by ${session.name}`
+            : `Invoice ${existing.invoiceNumber} status updated from ${existing.status} to ${status} by ${session.name}`,
+          actorName: session.name,
+        },
+      });
+
+      return inv;
     });
 
-    const isIssuing = existing.status === "DRAFT" && status === "PENDING";
-    await db.activityLog.create({
-      data: {
-        companyId: session.companyId,
-        action: isIssuing ? "INVOICE_ISSUED" : isTransitionToPaid ? "INVOICE_PAID" : "INVOICE_STATUS_CHANGED",
-        category: "FINANCE",
-        description: isIssuing
-          ? `Draft invoice ${existing.invoiceNumber} finalized and issued as ${targetInvoiceNumber} by ${session.name}`
-          : `Invoice ${existing.invoiceNumber} status updated from ${existing.status} to ${status} by ${session.name}`,
-        actorName: session.name,
-      },
-    });
-
+    revalidatePath("/finance");
     revalidatePath("/invoices");
     revalidatePath("/");
     return { success: true, invoice: updatedInvoice };

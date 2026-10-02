@@ -12,6 +12,8 @@ import {
   getAnalyticsData,
   updateCompanySettings,
   updateCustomer,
+  updateInvoiceStatus,
+  getFinanceData,
 } from "../src/lib/actions";
 
 const prisma = new PrismaClient();
@@ -297,6 +299,126 @@ async function runCrossModuleTests() {
     const shellNotifsB = await getShellData();
     const leaksToBeta = shellNotifsB.data!.notifications.some((n: any) => n.title === "Cross-module Event");
     assert(!leaksToBeta, "XMOD-20: Tenant B shell does not receive Tenant A notification");
+
+    // 10. Invoice -> Finance Settlement Integration (Phase 3C)
+    // XMOD-21: Atomic Settlement (PENDING -> PAID creates exactly one FinanceRecord)
+    setTestSession(sessionA_Admin);
+    const invoiceRes = await createNewInvoice({
+      customerId: custAId,
+      dueDate: "2026-11-01",
+      status: "PENDING",
+      items: [
+        {
+          description: "Enterprise Consulting Service",
+          quantity: 2,
+          unitPrice: 1500,
+        },
+      ],
+    });
+    assert(invoiceRes.success && !!invoiceRes.invoice, "XMOD-21a: Created PENDING invoice for settlement test");
+    const testInv = invoiceRes.invoice!;
+    const invExpectedTotal = testInv.totalAmount;
+
+    // Transition PENDING -> PAID
+    const payRes = await updateInvoiceStatus({
+      invoiceId: testInv.id,
+      status: "PAID",
+    });
+    assert(payRes.success && payRes.invoice?.status === "PAID", "XMOD-21b: Transitioned invoice to PAID");
+
+    // Verify exactly one corresponding FinanceRecord exists
+    const matchingRecords = await prisma.financeRecord.findMany({
+      where: {
+        companyId: compA.id,
+        description: { contains: testInv.invoiceNumber },
+      },
+    });
+    assert(matchingRecords.length === 1, "XMOD-21c: Exactly one FinanceRecord created on invoice settlement");
+    const settledRec = matchingRecords[0];
+    assert(
+      settledRec.type === "REVENUE" &&
+        settledRec.status === "SETTLED" &&
+        settledRec.category === "Invoicing" &&
+        settledRec.amount === invExpectedTotal &&
+        settledRec.companyId === compA.id &&
+        new Date(settledRec.date).getTime() === new Date(payRes.invoice!.paidAt!).getTime(),
+      "XMOD-21d: Settled FinanceRecord has correct fields (REVENUE, SETTLED, Invoicing, exact amount, matching paidAt)"
+    );
+
+    // XMOD-22: Tenant Isolation
+    assert(settledRec.companyId === compA.id, "XMOD-22a: FinanceRecord belongs to Tenant A companyId");
+    setTestSession(sessionB_Admin);
+    const finDataB = await getFinanceData();
+    const leakedToB = finDataB.records.some((r: any) => r.description.includes(testInv.invoiceNumber));
+    assert(!leakedToB, "XMOD-22b: Tenant B finance ledger cannot see Tenant A's invoice payment");
+
+    // XMOD-23: Idempotency (settling an already PAID invoice rejects and creates no duplicate)
+    setTestSession(sessionA_Admin);
+    const retryPay = await updateInvoiceStatus({
+      invoiceId: testInv.id,
+      status: "PAID",
+    });
+    assert(
+      !retryPay.success && retryPay.code === 409,
+      "XMOD-23a: Attempting to settle already PAID invoice returns HTTP 409 Conflict"
+    );
+    const recordsAfterRetry = await prisma.financeRecord.findMany({
+      where: {
+        companyId: compA.id,
+        description: { contains: testInv.invoiceNumber },
+      },
+    });
+    assert(recordsAfterRetry.length === 1, "XMOD-23b: Retrying payment settlement creates zero duplicate FinanceRecords");
+
+    // XMOD-24: Finance Ledger Consistency
+    const finDataA = await getFinanceData();
+    const hasSettledInA = finDataA.records.some((r: any) => r.id === settledRec.id);
+    assert(hasSettledInA, "XMOD-24a: Finance ledger records include the invoice settlement");
+    assert(
+      finDataA.totals.totalRev >= invExpectedTotal,
+      "XMOD-24b: Finance ledger total revenue reflects the settled invoice amount"
+    );
+
+    // XMOD-25: OVERDUE Settlement
+    const overdueInvRes = await createNewInvoice({
+      customerId: custAId,
+      dueDate: "2026-08-01",
+      status: "PENDING",
+      items: [
+        {
+          description: "Overdue Maintenance Retainer",
+          quantity: 1,
+          unitPrice: 2200,
+        },
+      ],
+    });
+    assert(overdueInvRes.success && !!overdueInvRes.invoice, "XMOD-25a: Created invoice for OVERDUE test");
+    const overdueInv = overdueInvRes.invoice!;
+    // Set to OVERDUE in database
+    await prisma.invoice.update({
+      where: { id: overdueInv.id },
+      data: { status: "OVERDUE" },
+    });
+
+    const overduePayRes = await updateInvoiceStatus({
+      invoiceId: overdueInv.id,
+      status: "PAID",
+    });
+    assert(overduePayRes.success && overduePayRes.invoice?.status === "PAID", "XMOD-25b: OVERDUE invoice settled to PAID");
+    const overdueMatching = await prisma.financeRecord.findMany({
+      where: {
+        companyId: compA.id,
+        description: { contains: overdueInv.invoiceNumber },
+      },
+    });
+    assert(overdueMatching.length === 1, "XMOD-25c: Exactly one FinanceRecord created for settled OVERDUE invoice");
+    assert(
+      overdueMatching[0].type === "REVENUE" &&
+        overdueMatching[0].status === "SETTLED" &&
+        overdueMatching[0].category === "Invoicing" &&
+        overdueMatching[0].amount === overdueInv.totalAmount,
+      "XMOD-25d: Settled OVERDUE FinanceRecord has correct REVENUE, SETTLED, Invoicing and amount"
+    );
 
   } finally {
     // Cleanup
