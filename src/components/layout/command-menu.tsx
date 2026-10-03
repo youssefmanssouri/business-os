@@ -52,18 +52,10 @@ export function CommandMenu({ isOpen, onClose }: CommandMenuProps) {
   };
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        if (isOpen) onClose();
-        else {
-          // Open menu via trigger
-        }
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+    if (!isOpen) {
+      setQuery("");
+    }
+  }, [isOpen]);
 
   return (
     <Dialog isOpen={isOpen} onClose={onClose} title="Command Palette" maxWidth="md">

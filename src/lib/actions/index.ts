@@ -2382,6 +2382,15 @@ export async function deleteFinanceRecord(rawInput: unknown) {
       };
     }
 
+    // Financial Audit Protection: Invoice-generated revenue records cannot be deleted directly
+    if (existing.category === "Invoicing") {
+      return {
+        success: false,
+        error: "Invoice-generated financial records cannot be deleted to preserve the billing and accounting audit trail.",
+        code: 409,
+      };
+    }
+
     await db.financeRecord.delete({
       where: { id: recordId },
     });

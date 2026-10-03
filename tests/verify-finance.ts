@@ -299,6 +299,82 @@ async function runFinanceTests() {
     assert(logs.some((l) => l.action === "FINANCE_RECORD_CREATED"), "ActivityLog recorded FINANCE_RECORD_CREATED event");
     assert(logs.some((l) => l.action === "FINANCE_RECORD_UPDATED"), "ActivityLog recorded FINANCE_RECORD_UPDATED event");
     assert(logs.some((l) => l.action === "FINANCE_RECORD_DELETED"), "ActivityLog recorded FINANCE_RECORD_DELETED event");
+
+    // ==========================================
+    // 7. INVOICE-GENERATED FINANCE RECORD INTEGRITY (PHASE 5)
+    // ==========================================
+    console.log("\n--- 7. Invoice-Generated Finance Record Integrity ---");
+
+    // Test 1: Create an invoice-generated FinanceRecord
+    const invoiceRecord = await prisma.financeRecord.create({
+      data: {
+        companyId: compA.id,
+        type: "REVENUE",
+        category: "Invoicing",
+        amount: 3500.0,
+        description: "Invoice INV-2026-9999 payment - Test Client Corp",
+        status: "SETTLED",
+      },
+    });
+
+    // Attempt deletion by ADMIN -> must be rejected with 409 Conflict
+    setTestSession(sessionA_Admin);
+    const invoiceRecordDeleteRes = await deleteFinanceRecord(invoiceRecord.id);
+    assert(
+      !invoiceRecordDeleteRes.success && invoiceRecordDeleteRes.code === 409,
+      "Invoice-generated FinanceRecord cannot be deleted (409 Conflict)"
+    );
+
+    // Verify record still exists in database
+    const invoiceRecordCheck = await prisma.financeRecord.findUnique({
+      where: { id: invoiceRecord.id },
+    });
+    assert(
+      invoiceRecordCheck !== null && invoiceRecordCheck.amount === 3500.0,
+      "Invoice-generated FinanceRecord still exists in database after rejected deletion"
+    );
+
+    // Test 2: Normal non-invoice FinanceRecord can still be deleted
+    const manualRecord = await prisma.financeRecord.create({
+      data: {
+        companyId: compA.id,
+        type: "EXPENSE",
+        category: "Software",
+        amount: 250.0,
+        description: "Monthly Cloudflare Enterprise Subscription",
+        status: "SETTLED",
+      },
+    });
+
+    const manualRecordDeleteRes = await deleteFinanceRecord(manualRecord.id);
+    assert(
+      manualRecordDeleteRes.success,
+      "Legitimate manual non-invoice FinanceRecord can still be deleted successfully"
+    );
+
+    const manualRecordCheck = await prisma.financeRecord.findUnique({
+      where: { id: manualRecord.id },
+    });
+    assert(
+      manualRecordCheck === null,
+      "Manual non-invoice FinanceRecord physically removed from database after deletion"
+    );
+
+    // Test 3: Tenant isolation remains intact
+    // Tenant B admin attempts to delete Tenant A's invoice record
+    setTestSession({
+      userId: userB_Admin.id,
+      companyId: compB.id,
+      role: "ADMIN",
+      email: userB_Admin.email,
+      name: userB_Admin.name,
+    });
+
+    const crossTenantDeleteRes = await deleteFinanceRecord(invoiceRecord.id);
+    assert(
+      !crossTenantDeleteRes.success && crossTenantDeleteRes.code === 404,
+      "Tenant B cannot delete Tenant A invoice-generated FinanceRecord (404 Access Denied)"
+    );
   } finally {
     // Cleanup test fixtures
     setTestSession(null);

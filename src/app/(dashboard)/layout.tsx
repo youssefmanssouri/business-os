@@ -36,9 +36,19 @@ export default function DashboardLayout({
     const handleRefresh = () => refreshShell();
     window.addEventListener("task-updated", handleRefresh);
     window.addEventListener("shell-refresh", handleRefresh);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setIsCommandOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
     return () => {
       window.removeEventListener("task-updated", handleRefresh);
       window.removeEventListener("shell-refresh", handleRefresh);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
