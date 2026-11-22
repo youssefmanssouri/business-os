@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 const prisma = new PrismaClient();
 
@@ -130,498 +131,269 @@ async function main() {
   });
 
 
-  // 4. Create Customers
-  const custVercel = await prisma.customer.create({
-    data: {
-      id: "cust_vercel",
-      companyId: acme.id,
-      name: "Guillermo Rauch",
-      email: "g.rauch@vercel.com",
-      companyName: "Vercel Inc.",
-      phone: "+1 (555) 019-2834",
-      status: "CUSTOMER",
-      totalSpent: 48500.0,
-    },
-  });
+  // 4. Demo data. Every customer, company and supplier below is fictional, and
+  // every email uses a reserved example domain (RFC 2606). Dates are relative to
+  // the moment the seed runs, so dashboards always show recent activity.
+  const DAY = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  // Times are wall-clock hours in the company's own timezone.
+  const daysAgo = (days: number, hour = 10, minute = 0) => {
+    const day = formatInTimeZone(new Date(now.getTime() - days * DAY), acme.timezone, "yyyy-MM-dd");
+    const time = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
+    return fromZonedTime(`${day} ${time}`, acme.timezone);
+  };
+  const daysAhead = (days: number, hour = 10, minute = 0) => daysAgo(-days, hour, minute);
+  const money = (value: number) => Math.round(value * 100) / 100;
 
-  const custLinear = await prisma.customer.create({
-    data: {
-      id: "cust_linear",
-      companyId: acme.id,
-      name: "Karri Saarinen",
-      email: "karri@linear.app",
-      companyName: "Linear Orbit Inc.",
-      phone: "+1 (555) 084-9122",
-      status: "CUSTOMER",
-      totalSpent: 36200.0,
-    },
-  });
+  const customerSeeds = [
+    { key: "harbor", name: "Nadia Berrada", email: "nadia.berrada@harborlane.example", companyName: "Harbor Lane Hospitality", phone: "+212 600-000-101", status: "CUSTOMER" },
+    { key: "argan", name: "Omar El Idrissi", email: "omar@argancoast.example", companyName: "Argan Coast Exports", phone: "+212 600-000-102", status: "CUSTOMER" },
+    { key: "brightpath", name: "Daniel Okafor", email: "d.okafor@brightpath.example", companyName: "Brightpath Freight", phone: "+1 (555) 010-2201", status: "CUSTOMER" },
+    { key: "tidewater", name: "Mei Tanaka", email: "mei.tanaka@tidewater.example", companyName: "Tidewater Analytics", phone: "+1 (555) 010-2202", status: "CUSTOMER" },
+    { key: "nordlys", name: "Lucas Moreau", email: "lucas@ateliernordlys.example", companyName: "Atelier Nordlys", phone: "+33 1 00 00 02 03", status: "CUSTOMER" },
+    { key: "oasis", name: "Samira Haddad", email: "s.haddad@oasisclinics.example", companyName: "Oasis Family Clinics", phone: "+212 600-000-104", status: "CUSTOMER" },
+    { key: "cedar", name: "Ethan Brooks", email: "ethan@cedarridge.example", companyName: "Cedar Ridge Supply", phone: "+1 (555) 010-2205", status: "CUSTOMER" },
+    { key: "medina", name: "Ines Alaoui", email: "ines@medinaroutes.example", companyName: "Medina Routes Travel", phone: "+212 600-000-106", status: "CUSTOMER" },
+    { key: "summit", name: "Rachid Benali", email: "rachid@summitfit.example", companyName: "Summit Fitness Studios", phone: "+212 600-000-107", status: "CUSTOMER" },
+    { key: "verdello", name: "Sofia Rinaldi", email: "sofia@verdellofoods.example", companyName: "Verdello Foods", phone: "+39 02 0000 0208", status: "PROSPECT" },
+    { key: "tazi", name: "Karim Tazi", email: "k.tazi@tazilegal.example", companyName: "Tazi & Partners Legal", phone: "+212 600-000-109", status: "PROSPECT" },
+    { key: "kettle", name: "Hannah Weber", email: "hannah@kettleandcrane.example", companyName: "Kettle & Crane Coffee", phone: "+49 30 0000 0210", status: "PROSPECT" },
+    { key: "bluewave", name: "Leila Chraibi", email: "leila@bluewavedental.example", companyName: "Bluewave Dental", phone: "+212 600-000-111", status: "LEAD" },
+    { key: "becker", name: "Tom Becker", email: "tom@beckerstudio.example", companyName: "Becker Architecture Studio", phone: "+49 30 0000 0212", status: "LEAD" },
+    { key: "quarry", name: "Grace Mensah", email: "grace@quarrystone.example", companyName: "Quarrystone Builders", phone: "+1 (555) 010-2213", status: "CHURNED" },
+  ] as const;
+  type CustomerKey = (typeof customerSeeds)[number]["key"];
 
-  const custStripe = await prisma.customer.create({
-    data: {
-      id: "cust_stripe",
-      companyId: acme.id,
-      name: "Patrick Collison",
-      email: "patrick@stripe.com",
-      companyName: "Stripe Press & Payments",
-      phone: "+1 (555) 099-3311",
-      status: "CUSTOMER",
-      totalSpent: 72000.0,
-    },
-  });
+  const customers = {} as Record<CustomerKey, { id: string; name: string; email: string; companyName: string | null }>;
+  for (const [index, seed] of customerSeeds.entries()) {
+    customers[seed.key] = await prisma.customer.create({
+      data: {
+        id: `cust_${seed.key}`,
+        companyId: acme.id,
+        name: seed.name,
+        email: seed.email,
+        companyName: seed.companyName,
+        phone: seed.phone,
+        status: seed.status,
+        lastContact: daysAgo(index % 9),
+        createdAt: daysAgo(150 - index * 7),
+      },
+    });
+  }
 
-  const custOpenAI = await prisma.customer.create({
-    data: {
-      id: "cust_openai",
-      companyId: acme.id,
-      name: "Sam Altman",
-      email: "sam@openai.com",
-      companyName: "OpenAI Research",
-      phone: "+1 (555) 044-8822",
-      status: "PROSPECT",
-      totalSpent: 12500.0,
-    },
-  });
-
-  const custSupabase = await prisma.customer.create({
-    data: {
-      id: "cust_supabase",
-      companyId: acme.id,
-      name: "Paul Copplestone",
-      email: "paul@supabase.io",
-      companyName: "Supabase Labs",
-      phone: "+1 (555) 033-7711",
-      status: "LEAD",
-      totalSpent: 0.0,
-    },
-  });
-
-  // 5. Create Deals (CRM Kanban)
+  // 5. Deals (CRM pipeline)
   await prisma.deal.createMany({
     data: [
-      {
-        companyId: acme.id,
-        customerId: custVercel.id,
-        title: "Frontend Infrastructure Enterprise Tier",
-        amount: 35000.0,
-        stage: "WON",
-        probability: 100,
-      },
-      {
-        companyId: acme.id,
-        customerId: custLinear.id,
-        title: "Productivity API Integration License",
-        amount: 24000.0,
-        stage: "WON",
-        probability: 100,
-      },
-      {
-        companyId: acme.id,
-        customerId: custStripe.id,
-        title: "Global Payments Orchestration Expansion",
-        amount: 68000.0,
-        stage: "PROPOSAL",
-        probability: 75,
-      },
-      {
-        companyId: acme.id,
-        customerId: custOpenAI.id,
-        title: "AI Inference Gateway Retainer",
-        amount: 120000.0,
-        stage: "CONTACTED",
-        probability: 50,
-      },
-      {
-        companyId: acme.id,
-        customerId: custSupabase.id,
-        title: "Database Sync Engine Pilot",
-        amount: 18000.0,
-        stage: "NEW_LEAD",
-        probability: 25,
-      },
+      { companyId: acme.id, customerId: customers.harbor.id, title: "Guest Booking Platform Rollout", amount: 42000, stage: "WON", probability: 100, expectedClose: daysAgo(40) },
+      { companyId: acme.id, customerId: customers.tidewater.id, title: "Reporting Warehouse Migration", amount: 36500, stage: "WON", probability: 100, expectedClose: daysAgo(21) },
+      { companyId: acme.id, customerId: customers.oasis.id, title: "Patient Scheduling Integration", amount: 28000, stage: "WON", probability: 100, expectedClose: daysAgo(9) },
+      { companyId: acme.id, customerId: customers.argan.id, title: "Export Order Tracking Portal", amount: 31000, stage: "PROPOSAL", probability: 70, expectedClose: daysAhead(14) },
+      { companyId: acme.id, customerId: customers.verdello.id, title: "Inventory Forecasting Pilot", amount: 18500, stage: "PROPOSAL", probability: 60, expectedClose: daysAhead(21) },
+      { companyId: acme.id, customerId: customers.tazi.id, title: "Client Document Vault", amount: 22000, stage: "CONTACTED", probability: 45, expectedClose: daysAhead(30) },
+      { companyId: acme.id, customerId: customers.kettle.id, title: "Loyalty App Prototype", amount: 14500, stage: "CONTACTED", probability: 40, expectedClose: daysAhead(35) },
+      { companyId: acme.id, customerId: customers.bluewave.id, title: "Online Appointment Booking", amount: 9800, stage: "NEW_LEAD", probability: 20, expectedClose: daysAhead(45) },
+      { companyId: acme.id, customerId: customers.becker.id, title: "Project Portfolio Website", amount: 7600, stage: "NEW_LEAD", probability: 20, expectedClose: daysAhead(50) },
+      { companyId: acme.id, customerId: customers.quarry.id, title: "Site Reporting Dashboard", amount: 16000, stage: "LOST", probability: 0, expectedClose: daysAgo(60) },
     ],
   });
 
-  // 6. Create Invoices
-  const inv1 = await prisma.invoice.create({
-    data: {
-      companyId: acme.id,
-      customerId: custStripe.id,
-      invoiceNumber: "INV-2026-001",
-      status: "PAID",
-      issueDate: new Date("2026-07-01"),
-      dueDate: new Date("2026-07-15"),
-      subtotal: 25000.0,
-      taxAmount: 2500.0,
-      discountAmount: 0.0,
-      totalAmount: 27500.0,
-      notes: "Payment received via Wire Transfer. Thank you for your partnership!",
-      items: {
-        create: [
-          { description: "Enterprise Architecture Consulting (Q3)", quantity: 1, unitPrice: 20000.0, amount: 20000.0 },
-          { description: "Dedicated SLA Support Channel (Monthly)", quantity: 1, unitPrice: 5000.0, amount: 5000.0 },
-        ],
-      },
-    },
-  });
+  // 6. Invoices: about six months of history, recent payments, pending, overdue and draft.
+  type InvoiceSeed = {
+    customer: CustomerKey;
+    issued: number; // days ago
+    dueIn: number; // days after issue
+    status: "PAID" | "PENDING" | "OVERDUE" | "DRAFT";
+    paid?: number; // days ago
+    items: { description: string; quantity: number; unitPrice: number }[];
+  };
+  const invoiceSeeds: InvoiceSeed[] = [
+    { customer: "tidewater", issued: 178, dueIn: 30, status: "PAID", paid: 165, items: [{ description: "Reporting needs assessment", quantity: 1, unitPrice: 5400 }] },
+    { customer: "harbor", issued: 170, dueIn: 14, status: "PAID", paid: 158, items: [{ description: "Website booking flow audit", quantity: 1, unitPrice: 4200 }, { description: "Monthly support plan", quantity: 1, unitPrice: 900 }] },
+    { customer: "brightpath", issued: 155, dueIn: 21, status: "PAID", paid: 140, items: [{ description: "Delivery tracking prototype", quantity: 1, unitPrice: 7800 }] },
+    { customer: "cedar", issued: 148, dueIn: 14, status: "PAID", paid: 136, items: [{ description: "Inventory spreadsheet migration", quantity: 1, unitPrice: 3600 }] },
+    { customer: "nordlys", issued: 138, dueIn: 21, status: "PAID", paid: 125, items: [{ description: "Catalogue content model", quantity: 1, unitPrice: 4900 }] },
+    { customer: "argan", issued: 128, dueIn: 14, status: "PAID", paid: 117, items: [{ description: "Export documents automation", quantity: 1, unitPrice: 6300 }] },
+    { customer: "harbor", issued: 118, dueIn: 14, status: "PAID", paid: 110, items: [{ description: "Booking platform discovery workshop", quantity: 1, unitPrice: 6400 }] },
+    { customer: "tidewater", issued: 112, dueIn: 30, status: "PAID", paid: 95, items: [{ description: "Data warehouse assessment", quantity: 1, unitPrice: 8200 }] },
+    { customer: "brightpath", issued: 104, dueIn: 21, status: "PAID", paid: 90, items: [{ description: "Fleet dashboard sprint", quantity: 2, unitPrice: 3900 }] },
+    { customer: "argan", issued: 97, dueIn: 14, status: "PAID", paid: 86, items: [{ description: "Order export integration", quantity: 1, unitPrice: 5600 }] },
+    { customer: "harbor", issued: 88, dueIn: 14, status: "PAID", paid: 80, items: [{ description: "Booking platform build, milestone 1", quantity: 1, unitPrice: 14000 }] },
+    { customer: "nordlys", issued: 82, dueIn: 21, status: "PAID", paid: 70, items: [{ description: "Online catalogue redesign", quantity: 1, unitPrice: 7200 }] },
+    { customer: "oasis", issued: 75, dueIn: 30, status: "PAID", paid: 61, items: [{ description: "Scheduling requirements audit", quantity: 1, unitPrice: 4800 }] },
+    { customer: "tidewater", issued: 68, dueIn: 30, status: "PAID", paid: 52, items: [{ description: "Warehouse migration, phase 1", quantity: 1, unitPrice: 12500 }] },
+    { customer: "cedar", issued: 60, dueIn: 14, status: "PAID", paid: 49, items: [{ description: "Stock alert automation", quantity: 1, unitPrice: 3900 }, { description: "Monthly support plan", quantity: 1, unitPrice: 900 }] },
+    { customer: "harbor", issued: 54, dueIn: 14, status: "PAID", paid: 44, items: [{ description: "Booking platform build, milestone 2", quantity: 1, unitPrice: 14000 }] },
+    { customer: "medina", issued: 47, dueIn: 21, status: "PAID", paid: 35, items: [{ description: "Tour booking widget", quantity: 1, unitPrice: 6100 }] },
+    { customer: "summit", issued: 40, dueIn: 14, status: "PAID", paid: 30, items: [{ description: "Member portal setup", quantity: 1, unitPrice: 5200 }] },
+    { customer: "tidewater", issued: 34, dueIn: 30, status: "PAID", paid: 20, items: [{ description: "Warehouse migration, phase 2", quantity: 1, unitPrice: 12500 }] },
+    { customer: "oasis", issued: 28, dueIn: 21, status: "PAID", paid: 16, items: [{ description: "Patient scheduling integration, milestone 1", quantity: 1, unitPrice: 9300 }] },
+    { customer: "argan", issued: 20, dueIn: 14, status: "PAID", paid: 6, items: [{ description: "Shipment status notifications", quantity: 1, unitPrice: 4200 }] },
+    { customer: "nordlys", issued: 18, dueIn: 14, status: "PAID", paid: 5, items: [{ description: "Catalogue search improvements", quantity: 1, unitPrice: 3100 }] },
+    { customer: "cedar", issued: 15, dueIn: 14, status: "PAID", paid: 4, items: [{ description: "Monthly support plan", quantity: 1, unitPrice: 900 }, { description: "Supplier import script", quantity: 1, unitPrice: 2400 }] },
+    { customer: "harbor", issued: 14, dueIn: 14, status: "PAID", paid: 3, items: [{ description: "Booking platform build, milestone 3", quantity: 1, unitPrice: 14000 }] },
+    { customer: "summit", issued: 12, dueIn: 14, status: "PAID", paid: 2, items: [{ description: "Class schedule sync", quantity: 1, unitPrice: 2800 }] },
+    { customer: "brightpath", issued: 10, dueIn: 21, status: "PAID", paid: 1, items: [{ description: "Route reporting module", quantity: 1, unitPrice: 6700 }] },
+    { customer: "medina", issued: 8, dueIn: 14, status: "PAID", paid: 0, items: [{ description: "Multilingual booking pages", quantity: 1, unitPrice: 3600 }] },
+    { customer: "oasis", issued: 6, dueIn: 30, status: "PENDING", items: [{ description: "Patient scheduling integration, milestone 2", quantity: 1, unitPrice: 9300 }] },
+    { customer: "tidewater", issued: 4, dueIn: 30, status: "PENDING", items: [{ description: "Warehouse migration, phase 3", quantity: 1, unitPrice: 11500 }] },
+    { customer: "argan", issued: 3, dueIn: 21, status: "PENDING", items: [{ description: "Export order portal, deposit", quantity: 1, unitPrice: 7750 }] },
+    { customer: "brightpath", issued: 45, dueIn: 21, status: "OVERDUE", items: [{ description: "Driver app maintenance (quarterly)", quantity: 1, unitPrice: 3300 }] },
+    { customer: "quarry", issued: 70, dueIn: 30, status: "OVERDUE", items: [{ description: "Site reporting prototype", quantity: 1, unitPrice: 4100 }] },
+    { customer: "summit", issued: 1, dueIn: 14, status: "DRAFT", items: [{ description: "Trainer payroll export", quantity: 1, unitPrice: 1900 }] },
+  ];
 
-  const inv2 = await prisma.invoice.create({
-    data: {
-      companyId: acme.id,
-      customerId: custVercel.id,
-      invoiceNumber: "INV-2026-002",
-      status: "PENDING",
-      issueDate: new Date("2026-07-20"),
-      dueDate: new Date("2026-08-10"),
-      subtotal: 18000.0,
-      taxAmount: 1800.0,
-      discountAmount: 1000.0,
-      totalAmount: 18800.0,
-      notes: "Net 20 payment terms. Direct bank transfer enabled.",
-      items: {
-        create: [
-          { description: "Edge Network Optimization Module", quantity: 2, unitPrice: 7500.0, amount: 15000.0 },
-          { description: "Security Vulnerability Audit", quantity: 1, unitPrice: 3000.0, amount: 3000.0 },
-        ],
+  const paidTotals = {} as Record<CustomerKey, number>;
+  const invoiceSeedsByIssueDate = [...invoiceSeeds].sort((a, b) => b.issued - a.issued);
+  for (const [index, seed] of invoiceSeedsByIssueDate.entries()) {
+    const issueDate = daysAgo(seed.issued, 9);
+    const subtotal = money(seed.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0));
+    const taxAmount = money(subtotal * (acme.taxRate / 100));
+    const totalAmount = money(subtotal + taxAmount);
+    const customer = customers[seed.customer];
+    if (seed.status === "PAID") {
+      paidTotals[seed.customer] = money((paidTotals[seed.customer] ?? 0) + totalAmount);
+    }
+    await prisma.invoice.create({
+      data: {
+        companyId: acme.id,
+        customerId: customer.id,
+        invoiceNumber: `INV-${issueDate.getUTCFullYear()}-${String(index + 1).padStart(3, "0")}`,
+        status: seed.status,
+        issueDate,
+        dueDate: new Date(issueDate.getTime() + seed.dueIn * DAY),
+        paidAt: seed.paid === undefined ? null : daysAgo(seed.paid, 11 + (index % 6)),
+        subtotal,
+        taxAmount,
+        discountAmount: 0,
+        totalAmount,
+        currency: acme.currency,
+        taxRate: acme.taxRate,
+        customerNameSnapshot: customer.name,
+        customerEmailSnapshot: customer.email,
+        customerCompanySnapshot: customer.companyName,
+        sellerNameSnapshot: acme.name,
+        notes: seed.status === "PAID" ? "Paid by bank transfer. Thank you." : "Payment due by bank transfer within the stated terms.",
+        items: {
+          create: seed.items.map((item) => ({ ...item, amount: money(item.quantity * item.unitPrice) })),
+        },
       },
-    },
-  });
-
-  const inv3 = await prisma.invoice.create({
-    data: {
-      companyId: acme.id,
-      customerId: custLinear.id,
-      invoiceNumber: "INV-2026-003",
-      status: "OVERDUE",
-      issueDate: new Date("2026-06-15"),
-      dueDate: new Date("2026-07-01"),
-      subtotal: 12000.0,
-      taxAmount: 1200.0,
-      discountAmount: 0.0,
-      totalAmount: 13200.0,
-      notes: "Overdue reminder sent. Please settle balance to prevent service pause.",
-      items: {
-        create: [
-          { description: "Custom Kanban Sync Integration", quantity: 1, unitPrice: 12000.0, amount: 12000.0 },
-        ],
-      },
-    },
-  });
+    });
+  }
+  for (const [key, total] of Object.entries(paidTotals)) {
+    await prisma.customer.update({ where: { id: customers[key as CustomerKey].id }, data: { totalSpent: total } });
+  }
 
   // 7. Services & Appointments (Bookings)
-  const service1 = await prisma.service.create({
-    data: {
-      companyId: acme.id,
-      title: "Executive Architecture Strategy Session",
-      description: "Comprehensive 60-minute deep dive into cloud topology, scaling, and cost efficiency.",
-      durationMinutes: 60,
-      price: 450.0,
-      category: "Strategy & Advisory",
-    },
+  const strategy = await prisma.service.create({
+    data: { companyId: acme.id, title: "Architecture Strategy Session", description: "A 60-minute review of a client's systems, scaling plans and costs.", durationMinutes: 60, price: 450, category: "Strategy & Advisory" },
+  });
+  const migration = await prisma.service.create({
+    data: { companyId: acme.id, title: "Onboarding & Data Migration", description: "Moving a client's records from spreadsheets or a legacy tool into BusinessOS.", durationMinutes: 120, price: 1200, category: "Implementation" },
+  });
+  const review = await prisma.service.create({
+    data: { companyId: acme.id, title: "Quarterly Business Review", description: "Reviewing delivery, usage and next-quarter priorities with the client.", durationMinutes: 45, price: 300, category: "Account Management" },
+  });
+  const training = await prisma.service.create({
+    data: { companyId: acme.id, title: "Team Training Workshop", description: "Hands-on training for a client's staff on their new workflows.", durationMinutes: 90, price: 650, category: "Training" },
   });
 
-  const service2 = await prisma.service.create({
-    data: {
-      companyId: acme.id,
-      title: "SaaS Onboarding & Data Migration",
-      description: "Full service data migration from legacy ERP into BusinessOS multi-tenant vault.",
-      durationMinutes: 120,
-      price: 1200.0,
-      category: "Implementation",
-    },
+  const appointment = (customer: CustomerKey, serviceId: string, staffId: string, start: Date, minutes: number, status: string, notes: string) => ({
+    companyId: acme.id, customerId: customers[customer].id, serviceId, staffId, startTime: start, endTime: new Date(start.getTime() + minutes * 60 * 1000), status, notes,
   });
-
   await prisma.appointment.createMany({
     data: [
-      {
-        companyId: acme.id,
-        customerId: custVercel.id,
-        serviceId: service1.id,
-        staffId: userYoussef.id,
-        startTime: new Date("2026-08-07T14:00:00Z"),
-        endTime: new Date("2026-08-07T15:00:00Z"),
-        status: "CONFIRMED",
-        notes: "Discuss Q4 infrastructure roadmap and multi-region deployment.",
-      },
-      {
-        companyId: acme.id,
-        customerId: custStripe.id,
-        serviceId: service2.id,
-        staffId: userAlex.id,
-        startTime: new Date("2026-08-08T10:00:00Z"),
-        endTime: new Date("2026-08-08T12:00:00Z"),
-        status: "CONFIRMED",
-        notes: "Automated webhook synchronization review.",
-      },
-      {
-        companyId: acme.id,
-        customerId: custLinear.id,
-        serviceId: service1.id,
-        staffId: userSarah.id,
-        startTime: new Date("2026-08-05T11:00:00Z"),
-        endTime: new Date("2026-08-05T12:00:00Z"),
-        status: "COMPLETED",
-        notes: "Finalized contract details for team subscription expansion.",
-      },
+      appointment("harbor", review.id, userSarah.id, daysAgo(6, 9), 45, "COMPLETED", "Reviewed milestone 3 scope and launch checklist."),
+      appointment("tidewater", migration.id, userAlex.id, daysAgo(5, 13), 120, "COMPLETED", "Migrated historical sales tables to the new warehouse."),
+      appointment("oasis", strategy.id, userYoussef.id, daysAgo(4, 10), 60, "COMPLETED", "Planned the second scheduling integration milestone."),
+      appointment("medina", training.id, userSarah.id, daysAgo(3, 14), 90, "COMPLETED", "Trained the booking team on multilingual pages."),
+      appointment("argan", strategy.id, userYoussef.id, daysAgo(2, 9), 60, "COMPLETED", "Walked through the export order portal proposal."),
+      appointment("summit", review.id, userSarah.id, daysAgo(1, 15), 45, "CANCELLED", "Client asked to move the review to next week."),
+      appointment("cedar", training.id, userAlex.id, daysAgo(1, 10), 90, "COMPLETED", "Trained warehouse staff on stock alerts."),
+      appointment("nordlys", review.id, userSarah.id, daysAgo(0, 9), 45, "COMPLETED", "Agreed on next quarter's catalogue priorities."),
+      appointment("verdello", strategy.id, userYoussef.id, daysAhead(1, 10), 60, "CONFIRMED", "Scope the inventory forecasting pilot."),
+      appointment("summit", review.id, userSarah.id, daysAhead(2, 15), 45, "CONFIRMED", "Rescheduled quarterly review."),
+      appointment("argan", migration.id, userAlex.id, daysAhead(3, 9), 120, "CONFIRMED", "Import historical export orders."),
+      appointment("tazi", strategy.id, userYoussef.id, daysAhead(5, 11), 60, "CONFIRMED", "Discuss document vault requirements."),
+      appointment("kettle", strategy.id, userSarah.id, daysAhead(8, 14), 60, "CONFIRMED", "Loyalty app prototype kickoff."),
+      appointment("oasis", training.id, userAlex.id, daysAhead(10, 9), 90, "CONFIRMED", "Train reception staff on the new scheduling flow."),
     ],
   });
 
-  // 8. Tasks (Linear-style Kanban)
+  // 8. Tasks (Kanban)
   await prisma.task.createMany({
     data: [
-      {
-        companyId: acme.id,
-        title: "Implement RBAC Middleware for Multi-Tenant Routing",
-        description: "Ensure companyId scoping on all Server Actions and API endpoints.",
-        status: "IN_PROGRESS",
-        priority: "URGENT",
-        assigneeId: userAlex.id,
-        dueDate: new Date("2026-08-10"),
-        tags: "Security, Backend",
-      },
-      {
-        companyId: acme.id,
-        title: "Design Linear-style Command Palette (Cmd+K)",
-        description: "Global keyboard shortcuts for instant navigation across all 11 modules.",
-        status: "DONE",
-        priority: "HIGH",
-        assigneeId: userYoussef.id,
-        dueDate: new Date("2026-08-04"),
-        tags: "UI/UX, Polish",
-      },
-      {
-        companyId: acme.id,
-        title: "Setup Stripe Webhooks for Automated Invoice Settlement",
-        description: "Parse invoice.payment_succeeded events and update Prisma status.",
-        status: "TODO",
-        priority: "HIGH",
-        assigneeId: userMarcus.id,
-        dueDate: new Date("2026-08-15"),
-        tags: "Payments, Finance",
-      },
-      {
-        companyId: acme.id,
-        title: "Audit Low Stock Threshold Alerts in Inventory Vault",
-        description: "Send push notification when server hardware units drop under 5 items.",
-        status: "REVIEW",
-        priority: "MEDIUM",
-        assigneeId: userSarah.id,
-        dueDate: new Date("2026-08-09"),
-        tags: "Inventory",
-      },
-      {
-        companyId: acme.id,
-        title: "Draft Q3 Customer Acquisition Report",
-        description: "Synthesize CRM conversion rates and top enterprise accounts.",
-        status: "TODO",
-        priority: "LOW",
-        assigneeId: userSarah.id,
-        dueDate: new Date("2026-08-20"),
-        tags: "Analytics",
-      },
+      { companyId: acme.id, title: "Ship booking platform milestone 3", description: "Final QA and launch checklist for Harbor Lane Hospitality.", status: "DONE", priority: "HIGH", assigneeId: userAlex.id, dueDate: daysAgo(3), tags: "Delivery" },
+      { companyId: acme.id, title: "Prepare export portal proposal", description: "Pricing, timeline and scope for Argan Coast Exports.", status: "REVIEW", priority: "HIGH", assigneeId: userSarah.id, dueDate: daysAhead(2), tags: "Sales" },
+      { companyId: acme.id, title: "Chase overdue invoice for Brightpath Freight", description: "Send a reminder and confirm the payment date.", status: "IN_PROGRESS", priority: "URGENT", assigneeId: userMarcus.id, dueDate: daysAhead(1), tags: "Finance" },
+      { companyId: acme.id, title: "Warehouse migration, phase 3 data checks", description: "Validate row counts and totals after the final migration batch.", status: "IN_PROGRESS", priority: "HIGH", assigneeId: userAlex.id, dueDate: daysAhead(4), tags: "Delivery, Data" },
+      { companyId: acme.id, title: "Reorder network switches", description: "Stock is below the minimum alert level.", status: "TODO", priority: "MEDIUM", assigneeId: userMarcus.id, dueDate: daysAhead(5), tags: "Inventory" },
+      { companyId: acme.id, title: "Draft quarterly client report", description: "Revenue by client, delivery status and pipeline summary.", status: "TODO", priority: "MEDIUM", assigneeId: userSarah.id, dueDate: daysAhead(9), tags: "Analytics" },
+      { companyId: acme.id, title: "Update onboarding checklist", description: "Add the data migration validation steps.", status: "TODO", priority: "LOW", assigneeId: userYoussef.id, dueDate: daysAhead(14), tags: "Operations" },
+      { companyId: acme.id, title: "Renew design tool licenses", description: "Annual renewal for the design and documentation tools.", status: "DONE", priority: "LOW", assigneeId: userMarcus.id, dueDate: daysAgo(8), tags: "Admin" },
     ],
   });
 
-  // 9. Inventory Products
+  // 9. Inventory Products (fictional suppliers)
   await prisma.product.createMany({
     data: [
-      {
-        companyId: acme.id,
-        name: "Enterprise Edge Server Rack R750",
-        sku: "HW-R750-01",
-        category: "Hardware",
-        price: 4950.0,
-        cost: 3200.0,
-        stock: 14,
-        minStockAlert: 5,
-        supplier: "Dell Enterprise Corp",
-        barcode: "88902194012",
-      },
-      {
-        companyId: acme.id,
-        name: "Fiber Optic Switch 100Gbps Gateway",
-        sku: "NET-GW-100G",
-        category: "Networking",
-        price: 2100.0,
-        cost: 1400.0,
-        stock: 3, // Triggers Low Stock Alert!
-        minStockAlert: 5,
-        supplier: "Cisco Systems",
-        barcode: "77201948102",
-      },
-      {
-        companyId: acme.id,
-        name: "Developer Workstation Pro Max M3",
-        sku: "DEV-WS-M3P",
-        category: "Hardware",
-        price: 3499.0,
-        cost: 2800.0,
-        stock: 22,
-        minStockAlert: 4,
-        supplier: "Apple Direct Supply",
-        barcode: "19594901294",
-      },
-      {
-        companyId: acme.id,
-        name: "Encrypted Hardware Key Vault v2",
-        sku: "SEC-KEY-V2",
-        category: "Security",
-        price: 199.0,
-        cost: 85.0,
-        stock: 45,
-        minStockAlert: 10,
-        supplier: "Yubico Supply",
-        barcode: "50601948210",
-      },
+      { companyId: acme.id, name: "Edge Server Rack ES-2", sku: "HW-ES2-01", category: "Hardware", price: 4950, cost: 3200, stock: 14, minStockAlert: 5, supplier: "Meridian Hardware Supply", barcode: "1000000000011" },
+      { companyId: acme.id, name: "Network Switch 48-Port", sku: "NET-SW-48", category: "Networking", price: 2100, cost: 1400, stock: 3, minStockAlert: 5, supplier: "Kestrel Networks Ltd", barcode: "1000000000028" }, // Below the low-stock alert
+      { companyId: acme.id, name: "Developer Laptop 16-inch", sku: "DEV-LT-16", category: "Hardware", price: 2490, cost: 1900, stock: 22, minStockAlert: 4, supplier: "Harbor Devices Co.", barcode: "1000000000035" },
+      { companyId: acme.id, name: "Hardware Security Key", sku: "SEC-KEY-V2", category: "Security", price: 59, cost: 28, stock: 45, minStockAlert: 10, supplier: "Sentinel Keys Ltd", barcode: "1000000000042" },
+      { companyId: acme.id, name: "Wireless Access Point AX", sku: "NET-AP-AX", category: "Networking", price: 340, cost: 210, stock: 18, minStockAlert: 6, supplier: "Kestrel Networks Ltd", barcode: "1000000000059" },
+      { companyId: acme.id, name: "27-inch Monitor", sku: "HW-MON-27", category: "Hardware", price: 420, cost: 290, stock: 4, minStockAlert: 5, supplier: "Harbor Devices Co.", barcode: "1000000000066" }, // Below the low-stock alert
     ],
   });
 
-  // 10. Finance Records (Cash Flow)
-  await prisma.financeRecord.createMany({
-    data: [
-      {
-        companyId: acme.id,
-        type: "REVENUE",
-        category: "SaaS Subscriptions",
-        amount: 84500.0,
-        date: new Date("2026-08-01"),
-        description: "Monthly recurring subscription payments via Stripe.",
-        status: "SETTLED",
-      },
-      {
-        companyId: acme.id,
-        type: "REVENUE",
-        category: "Enterprise Consulting",
-        amount: 27500.0,
-        date: new Date("2026-08-03"),
-        description: "Invoice INV-2026-001 settlement from Stripe Press.",
-        status: "SETTLED",
-      },
-      {
-        companyId: acme.id,
-        type: "EXPENSE",
-        category: "Cloud Infrastructure",
-        amount: 14200.0,
-        date: new Date("2026-08-02"),
-        description: "AWS Multi-Region Compute & Database cluster invoice.",
-        status: "SETTLED",
-      },
-      {
-        companyId: acme.id,
-        type: "EXPENSE",
-        category: "Payroll & Salaries",
-        amount: 42000.0,
-        date: new Date("2026-08-04"),
-        description: "Bi-weekly executive & engineering staff payroll.",
-        status: "SETTLED",
-      },
-      {
-        companyId: acme.id,
-        type: "EXPENSE",
-        category: "Software Tooling",
-        amount: 3800.0,
-        date: new Date("2026-08-05"),
-        description: "Linear, Vercel, Figma, and Notion workspace licenses.",
-        status: "SETTLED",
-      },
-    ],
-  });
+  // 10. Finance Records (cash flow): six months of revenue and expenses.
+  const financeData: { type: string; category: string; amount: number; date: Date; description: string; status: string }[] = [];
+  const monthlyRevenue = [22400, 26900, 31200, 36800, 42500, 47900];
+  const monthlyPayroll = [16200, 16200, 18500, 18500, 19800, 19800];
+  const monthlyHosting = [2500, 2700, 2900, 3100, 3350, 3600];
+  for (let month = 0; month < 6; month++) {
+    const base = 165 - month * 30; // roughly one month apart, oldest first
+    financeData.push(
+      { type: "REVENUE", category: "Client Projects", amount: monthlyRevenue[month], date: daysAgo(base - 2), description: "Project milestone payments received this month.", status: "SETTLED" },
+      { type: "REVENUE", category: "Support Plans", amount: 4200 + month * 450, date: daysAgo(base - 1), description: "Monthly support plan payments.", status: "SETTLED" },
+      { type: "EXPENSE", category: "Payroll", amount: monthlyPayroll[month], date: daysAgo(base - 4), description: "Monthly staff payroll.", status: "SETTLED" },
+      { type: "EXPENSE", category: "Cloud Hosting", amount: monthlyHosting[month], date: daysAgo(base - 3), description: "Hosting and database services.", status: "SETTLED" },
+      { type: "EXPENSE", category: "Software", amount: 780 + month * 40, date: daysAgo(base - 5), description: "Design, documentation and project-management tool licenses.", status: "SETTLED" },
+      { type: "EXPENSE", category: "Office", amount: 1250, date: daysAgo(base - 6), description: "Office rent and utilities.", status: "SETTLED" },
+    );
+  }
+  financeData.push({ type: "EXPENSE", category: "Marketing", amount: 1600, date: daysAgo(12), description: "Trade fair stand and printed materials.", status: "SETTLED" });
+  financeData.push({ type: "EXPENSE", category: "Hardware", amount: 2840, date: daysAhead(3), description: "Network switch reorder (scheduled).", status: "PENDING" });
+  await prisma.financeRecord.createMany({ data: financeData.map((record) => ({ companyId: acme.id, ...record })) });
 
   // 11. Documents
   await prisma.document.createMany({
     data: [
-      {
-        companyId: acme.id,
-        name: "Acme Cloud Master Service Agreement 2026.pdf",
-        category: "Contracts",
-        size: "2.4 MB",
-        tags: "Legal, Enterprise",
-        uploadedById: userYoussef.id,
-      },
-      {
-        companyId: acme.id,
-        name: "Q2 2026 Financial Audit & Cash Flow Report.pdf",
-        category: "Finance",
-        size: "5.1 MB",
-        tags: "Audit, Executive",
-        uploadedById: userMarcus.id,
-      },
-      {
-        companyId: acme.id,
-        name: "SOC2 Type II Security Compliance Certification.pdf",
-        category: "Security",
-        size: "1.8 MB",
-        tags: "Compliance, SOC2",
-        uploadedById: userAlex.id,
-      },
-      {
-        companyId: acme.id,
-        name: "Global Employee Benefits & Code of Conduct.pdf",
-        category: "HR",
-        size: "890 KB",
-        tags: "Internal, HR",
-        uploadedById: userSarah.id,
-      },
+      { companyId: acme.id, name: "Master Service Agreement - Harbor Lane Hospitality.pdf", category: "Contracts", size: "2.4 MB", tags: "Legal, Client", uploadedById: userYoussef.id, createdAt: daysAgo(120) },
+      { companyId: acme.id, name: "Quarterly Cash Flow Report.pdf", category: "Finance", size: "1.6 MB", tags: "Finance, Executive", uploadedById: userMarcus.id, createdAt: daysAgo(20) },
+      { companyId: acme.id, name: "Security Practices Overview.pdf", category: "Security", size: "1.1 MB", tags: "Security", uploadedById: userAlex.id, createdAt: daysAgo(64) },
+      { companyId: acme.id, name: "Employee Handbook.pdf", category: "HR", size: "890 KB", tags: "Internal, HR", uploadedById: userSarah.id, createdAt: daysAgo(140) },
+      { companyId: acme.id, name: "Export Portal Proposal - Argan Coast Exports.pdf", category: "Contracts", size: "740 KB", tags: "Sales, Proposal", uploadedById: userSarah.id, createdAt: daysAgo(2) },
     ],
   });
 
   // 12. Activity Logs & Notifications
   await prisma.activityLog.createMany({
     data: [
-      {
-        companyId: acme.id,
-        action: "INVOICE_SETTLED",
-        category: "FINANCE",
-        description: "Invoice INV-2026-001 ($27,500.00) marked as PAID by Stripe Press.",
-        actorName: "Youssef Manssouri",
-      },
-      {
-        companyId: acme.id,
-        action: "DEAL_ADVANCED",
-        category: "CRM",
-        description: "Global Payments Expansion deal moved to PROPOSAL stage ($68,000.00).",
-        actorName: "Sarah Jenkins",
-      },
-      {
-        companyId: acme.id,
-        action: "LOW_STOCK_TRIGGER",
-        category: "INVENTORY",
-        description: "Fiber Optic Switch 100Gbps stock fell below minimum alert (3 left).",
-        actorName: "System Automation",
-      },
-      {
-        companyId: acme.id,
-        action: "APPOINTMENT_SCHEDULED",
-        category: "BOOKINGS",
-        description: "Executive Strategy Session booked with Vercel Inc for Aug 7.",
-        actorName: "Alex Chen",
-      },
+      { companyId: acme.id, action: "INVOICE_SETTLED", category: "FINANCE", description: "Medina Routes Travel paid an invoice for multilingual booking pages.", actorName: "Marcus Vance", createdAt: daysAgo(0, 11, 20) },
+      { companyId: acme.id, action: "APPOINTMENT_COMPLETED", category: "BOOKINGS", description: "Quarterly review with Atelier Nordlys completed.", actorName: "Sarah Jenkins", createdAt: daysAgo(0, 9, 50) },
+      { companyId: acme.id, action: "INVOICE_SETTLED", category: "FINANCE", description: "Brightpath Freight paid the route reporting module invoice.", actorName: "Marcus Vance", createdAt: daysAgo(1, 16, 5) },
+      { companyId: acme.id, action: "DEAL_ADVANCED", category: "CRM", description: "Export Order Tracking Portal moved to Proposal.", actorName: "Sarah Jenkins", createdAt: daysAgo(2, 10, 30) },
+      { companyId: acme.id, action: "TASK_COMPLETED", category: "TASKS", description: "Booking platform milestone 3 shipped.", actorName: "Alex Chen", createdAt: daysAgo(3, 17, 45) },
+      { companyId: acme.id, action: "LOW_STOCK_TRIGGER", category: "INVENTORY", description: "Network Switch 48-Port fell below the minimum stock level (3 left).", actorName: "System Automation", createdAt: daysAgo(4, 8, 0) },
+      { companyId: acme.id, action: "DEAL_WON", category: "CRM", description: "Patient Scheduling Integration won with Oasis Family Clinics.", actorName: "Youssef Manssouri", createdAt: daysAgo(9, 14, 10) },
     ],
   });
 
   await prisma.notification.createMany({
     data: [
-      {
-        companyId: acme.id,
-        userId: userYoussef.id,
-        title: "New High-Value Lead Added",
-        message: "Supabase Labs was registered into the CRM pipeline by Sarah Jenkins.",
-        type: "SUCCESS",
-      },
-      {
-        companyId: acme.id,
-        userId: userYoussef.id,
-        title: "Low Inventory Alert",
-        message: "Fiber Optic Switch 100Gbps Gateway reached low threshold (3 items).",
-        type: "WARNING",
-      },
-      {
-        companyId: acme.id,
-        userId: userYoussef.id,
-        title: "Invoice INV-2026-003 Overdue",
-        message: "Linear Orbit Inc payment of $13,200.00 is past due date.",
-        type: "ALERT",
-      },
+      { companyId: acme.id, userId: userYoussef.id, title: "Payment received", message: "Medina Routes Travel paid their latest invoice.", type: "SUCCESS", createdAt: daysAgo(0, 11, 21) },
+      { companyId: acme.id, userId: userYoussef.id, title: "Low inventory alert", message: "Network Switch 48-Port is below its minimum stock level (3 left).", type: "WARNING", createdAt: daysAgo(4, 8, 1) },
+      { companyId: acme.id, userId: userYoussef.id, title: "Invoice overdue", message: "Brightpath Freight's quarterly maintenance invoice is past its due date.", type: "ALERT", createdAt: daysAgo(2, 9, 0) },
     ],
   });
 
