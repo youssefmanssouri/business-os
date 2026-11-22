@@ -472,11 +472,13 @@ async function runBookingSecurityTests() {
     "Timezone: 10:00 AM New York (EDT) correctly translates to 14:00:00 UTC"
   );
 
-  // Non-DST Timezone (Africa/Casablanca)
-  const casaUtc = parseCompanyDateTime("2026-09-21", "10:00", "Africa/Casablanca");
+  // Non-DST Timezone (Asia/Tokyo: UTC+9 all year, no DST since 1951).
+  // Africa/Casablanca was used here before, but its offset depends on the
+  // installed tz database release, which made this assertion environment-dependent.
+  const tokyoUtc = parseCompanyDateTime("2026-09-21", "10:00", "Asia/Tokyo");
   assert(
-    casaUtc.toISOString() === "2026-09-21T09:00:00.000Z",
-    "Timezone: 10:00 AM Casablanca (UTC+1) correctly translates to 09:00:00 UTC"
+    tokyoUtc.toISOString() === "2026-09-21T01:00:00.000Z",
+    "Timezone: 10:00 AM Tokyo (UTC+9) correctly translates to 01:00:00 UTC"
   );
 
   // DST Spring-Forward Gap Detection (2026-03-08 at 02:30 AM does not exist in America/New_York)

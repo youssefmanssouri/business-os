@@ -1375,9 +1375,12 @@ async function runInvoiceSecurityTests() {
 
   // --- L10 to L16: Issued Immutability ---
   // L10: Non-draft (PENDING) invoice items update rejected with 409
+  // Due date relative to the run date, so this invoice stays "future-due" (Test L21)
+  // whenever the suite runs. A fixed date silently turns it OVERDUE once passed.
+  const futureDueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const pendingInvForLock = await createNewInvoice({
     customerId: sec12CustomerA.id,
-    dueDate: "2026-11-15",
+    dueDate: futureDueDate,
     items: [{ description: "Immutable Item", quantity: 2, unitPrice: 100 }],
   });
   if (pendingInvForLock.invoice) section12InvoiceIds.push(pendingInvForLock.invoice.id);
@@ -1465,7 +1468,7 @@ async function runInvoiceSecurityTests() {
   const draftForReassign = await createNewInvoice({
     customerId: sec12CustomerA.id,
     status: "DRAFT",
-    dueDate: "2026-12-01",
+    dueDate: futureDueDate,
     items: [{ description: "Draft Service", quantity: 1, unitPrice: 200 }],
   });
   if (draftForReassign.invoice) section12InvoiceIds.push(draftForReassign.invoice.id);
@@ -1615,9 +1618,12 @@ async function runInvoiceSecurityTests() {
     "Test L28: Next sequence correctly advances past gaps (seq4 === seq3 + 1)"
   );
 
-  // L29: Invoice numbers are scoped by year (INV-YYYY-XXXX)
+  // L29: Invoice numbers are scoped by year (INV-YYYY-XXXX). The expected year is the
+  // invoice's own issue year, so the assertion holds in any calendar year.
+  const issueYearPrefix = (invoice: { issueDate: Date | string }) =>
+    `INV-${new Date(invoice.issueDate).getUTCFullYear()}-`;
   assert(
-    invSeq4.invoice!.invoiceNumber.startsWith("INV-2026-"),
+    invSeq4.invoice!.invoiceNumber.startsWith(issueYearPrefix(invSeq4.invoice!)),
     "Test L29: Invoice sequence numbers are strictly formatted with 4-digit issue year"
   );
 
@@ -1631,7 +1637,7 @@ async function runInvoiceSecurityTests() {
   if (apexSeqInv.invoice) section12InvoiceIds.push(apexSeqInv.invoice.id);
   setTestSession(acmeAdminSession);
   assert(
-    Boolean(apexSeqInv.success && apexSeqInv.invoice?.invoiceNumber.startsWith("INV-2026-")),
+    Boolean(apexSeqInv.success && apexSeqInv.invoice && apexSeqInv.invoice.invoiceNumber.startsWith(issueYearPrefix(apexSeqInv.invoice))),
     "Test L30: Invoice numbering operates with complete tenant isolation across companies"
   );
 
