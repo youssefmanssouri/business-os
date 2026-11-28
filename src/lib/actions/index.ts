@@ -138,10 +138,9 @@ export async function loginAction(rawInput: unknown) {
     };
   } catch (error: any) {
     console.error("Login action error:", error);
-    const detail = error?.message && typeof error.message === "string" ? error.message : "";
     return {
       success: false,
-      error: detail || "An unexpected authentication error occurred. Please try again.",
+      error: "An unexpected authentication error occurred. Please try again.",
       code: 500,
     };
   }

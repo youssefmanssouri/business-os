@@ -1,6 +1,7 @@
 {
   "name": "business-os",
   "version": "1.0.0",
+  "license": "Apache-2.0",
   "private": true,
   "scripts": {
     "dev": "node scripts/sync-database-provider.js && next dev",

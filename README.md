@@ -80,3 +80,7 @@ The [runner](scripts/run-all-tests.js) executes each TypeScript suite and exits 
 [CRM pipeline](screenshots/businessos/crm-pipeline.png) · [Invoices](screenshots/businessos/invoices.png) · [Bookings](screenshots/businessos/bookings.png) · [Finance](screenshots/businessos/finance.png)
 
 Built by [Youssef Manssouri](https://www.youssefmanssouri.site) as an independent project.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE). Copyright 2026 Youssef Manssouri.
