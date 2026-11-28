@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { formatInTimeZone } from "date-fns-tz";
 import {
   createSessionToken,
   verifySessionToken,
@@ -1707,7 +1708,7 @@ async function runInvoiceSecurityTests() {
   });
 
   const metricsAfterPayment = await getDashboardMetrics();
-  const todayStr = nowForPayment.toLocaleDateString("en-US", { weekday: "short" });
+  const todayStr = formatInTimeZone(nowForPayment, metricsAfterPayment.company.timezone, "EEE");
   const todayAnalytics = metricsAfterPayment.weeklyAnalytics.find((d) => d.day === todayStr);
   assert(
     todayAnalytics !== undefined && todayAnalytics.revenue >= 550,
