@@ -1,0 +1,72 @@
+name: Security Scanners
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    - cron: '35 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sec-scanners-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  osv-scanner:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
+    with:
+      fail-on-vuln: false
+      upload-sarif: true
+
+  semgrep:
+    name: Semgrep SAST Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: '3.12'
+      - name: Install Semgrep
+        run: python -m pip install --no-cache-dir semgrep
+      - name: Run Semgrep SAST
+        run: |
+          semgrep scan --config p/owasp-top-ten --config p/nextjs --config p/typescript --sarif --output semgrep.sarif .
+          semgrep scan --config p/owasp-top-ten --config p/nextjs --config p/typescript --text . || true
+      - name: Upload Semgrep SARIF
+        uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          sarif_file: 'semgrep.sarif'
+          category: 'semgrep'
