@@ -72,7 +72,7 @@ export async function loginAction(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid input",
+        error: parseResult.error.issues[0]?.message || "Invalid input",
         errors: parseResult.error.flatten().fieldErrors,
         code: 400,
       };
@@ -156,7 +156,7 @@ export async function registerAction(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid input",
+        error: parseResult.error.issues[0]?.message || "Invalid input",
         errors: parseResult.error.flatten().fieldErrors,
         code: 400,
       };
@@ -500,7 +500,7 @@ export async function createNewCustomer(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid customer input",
+        error: parseResult.error.issues[0]?.message || "Invalid customer input",
         code: 400,
       };
     }
@@ -602,7 +602,7 @@ export async function createNewDeal(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid deal input",
+        error: parseResult.error.issues[0]?.message || "Invalid deal input",
         code: 400,
       };
     }
@@ -677,7 +677,7 @@ export async function updateDealStage(dealId: string, newStage: string) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid stage update input",
+        error: parseResult.error.issues[0]?.message || "Invalid stage update input",
         code: 400,
       };
     }
@@ -741,7 +741,7 @@ export async function updateDeal(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid deal update input",
+        error: parseResult.error.issues[0]?.message || "Invalid deal update input",
         code: 400,
       };
     }
@@ -894,7 +894,7 @@ export async function updateCustomer(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid customer update data",
+        error: parseResult.error.issues[0]?.message || "Invalid customer update data",
         code: 400,
       };
     }
@@ -1162,7 +1162,7 @@ export async function createNewTask(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid task input",
+        error: parseResult.error.issues[0]?.message || "Invalid task input",
         code: 400,
       };
     }
@@ -1264,7 +1264,7 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid status update data",
+        error: parseResult.error.issues[0]?.message || "Invalid status update data",
         code: 400,
       };
     }
@@ -1357,7 +1357,7 @@ export async function deleteTask(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid task ID",
+        error: parseResult.error.issues[0]?.message || "Invalid task ID",
         code: 400,
       };
     }
@@ -1479,7 +1479,7 @@ export async function createProduct(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid product input",
+        error: parseResult.error.issues[0]?.message || "Invalid product input",
         code: 400,
       };
     }
@@ -1571,7 +1571,7 @@ export async function updateProduct(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid update data",
+        error: parseResult.error.issues[0]?.message || "Invalid update data",
         code: 400,
       };
     }
@@ -1680,7 +1680,7 @@ export async function deleteProduct(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid product ID",
+        error: parseResult.error.issues[0]?.message || "Invalid product ID",
         code: 400,
       };
     }
@@ -1811,7 +1811,7 @@ export async function createEmployee(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid employee data",
+        error: parseResult.error.issues[0]?.message || "Invalid employee data",
         code: 400,
       };
     }
@@ -1916,7 +1916,7 @@ export async function updateEmployee(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid update data",
+        error: parseResult.error.issues[0]?.message || "Invalid update data",
         code: 400,
       };
     }
@@ -2210,7 +2210,7 @@ export async function createFinanceRecord(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid finance record input",
+        error: parseResult.error.issues[0]?.message || "Invalid finance record input",
         code: 400,
       };
     }
@@ -2276,7 +2276,7 @@ export async function updateFinanceRecord(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid update data",
+        error: parseResult.error.issues[0]?.message || "Invalid update data",
         code: 400,
       };
     }
@@ -2358,7 +2358,7 @@ export async function deleteFinanceRecord(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid record ID",
+        error: parseResult.error.issues[0]?.message || "Invalid record ID",
         code: 400,
       };
     }
@@ -2493,7 +2493,7 @@ export async function createDocument(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid document input",
+        error: parseResult.error.issues[0]?.message || "Invalid document input",
         code: 400,
       };
     }
@@ -2570,7 +2570,7 @@ export async function updateDocument(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid update data",
+        error: parseResult.error.issues[0]?.message || "Invalid update data",
         code: 400,
       };
     }
@@ -2669,7 +2669,7 @@ export async function deleteDocument(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid document ID",
+        error: parseResult.error.issues[0]?.message || "Invalid document ID",
         code: 400,
       };
     }
@@ -2891,7 +2891,7 @@ export async function createNewInvoice(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid invoice data",
+        error: parseResult.error.issues[0]?.message || "Invalid invoice data",
         code: 400,
       };
     }
@@ -3093,7 +3093,7 @@ export async function updateInvoiceStatus(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid status input",
+        error: parseResult.error.issues[0]?.message || "Invalid status input",
         code: 400,
       };
     }
@@ -3267,7 +3267,7 @@ export async function updateInvoice(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid invoice data",
+        error: parseResult.error.issues[0]?.message || "Invalid invoice data",
         code: 400,
       };
     }
@@ -3573,7 +3573,7 @@ export async function updateCompanySettings(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid settings input",
+        error: parseResult.error.issues[0]?.message || "Invalid settings input",
         code: 400,
       };
     }
@@ -3766,7 +3766,7 @@ export async function createAppointment(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid appointment input",
+        error: parseResult.error.issues[0]?.message || "Invalid appointment input",
         code: 400,
       };
     }
@@ -4012,7 +4012,7 @@ export async function rescheduleAppointment(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid appointment reschedule input",
+        error: parseResult.error.issues[0]?.message || "Invalid appointment reschedule input",
         code: 400,
       };
     }
@@ -4277,7 +4277,7 @@ export async function updateAppointmentStatus(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid status input",
+        error: parseResult.error.issues[0]?.message || "Invalid status input",
         code: 400,
       };
     }
@@ -4480,7 +4480,7 @@ export async function createService(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid service input",
+        error: parseResult.error.issues[0]?.message || "Invalid service input",
         code: 400,
       };
     }
@@ -4533,7 +4533,7 @@ export async function updateService(rawInput: unknown) {
     if (!parseResult.success) {
       return {
         success: false,
-        error: parseResult.error.errors[0]?.message || "Invalid service input",
+        error: parseResult.error.issues[0]?.message || "Invalid service input",
         code: 400,
       };
     }

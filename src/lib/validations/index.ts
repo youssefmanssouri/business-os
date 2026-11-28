@@ -5,13 +5,13 @@ import { z } from "zod";
  */
 export const loginSchema = z.object({
   email: z
-    .string({ required_error: "Email is required" })
+    .string({ error: "Email is required" })
     .email("Please provide a valid email address")
     .max(120, "Email cannot exceed 120 characters")
     .trim()
     .toLowerCase(),
   password: z
-    .string({ required_error: "Password is required" })
+    .string({ error: "Password is required" })
     .min(6, "Password must be at least 6 characters")
     .max(100, "Password cannot exceed 100 characters"),
 });
@@ -21,22 +21,22 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export const registerSchema = z
   .object({
     name: z
-      .string({ required_error: "Full name is required" })
+      .string({ error: "Full name is required" })
       .trim()
       .min(2, "Full name must be at least 2 characters")
       .max(100, "Full name cannot exceed 100 characters"),
     email: z
-      .string({ required_error: "Email is required" })
+      .string({ error: "Email is required" })
       .trim()
       .email("Please provide a valid email address")
       .max(120, "Email cannot exceed 120 characters")
       .toLowerCase(),
     password: z
-      .string({ required_error: "Password is required" })
+      .string({ error: "Password is required" })
       .min(8, "Password must be at least 8 characters")
       .max(100, "Password cannot exceed 100 characters"),
     confirmPassword: z
-      .string({ required_error: "Confirm password is required" })
+      .string({ error: "Confirm password is required" })
       .min(1, "Please confirm your password"),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -51,12 +51,12 @@ export type RegisterInput = z.infer<typeof registerSchema>;
  */
 export const customerCreateSchema = z.object({
   name: z
-    .string({ required_error: "Customer name is required" })
+    .string({ error: "Customer name is required" })
     .trim()
     .min(1, "Name cannot be empty")
     .max(120, "Name cannot exceed 120 characters"),
   email: z
-    .string({ required_error: "Email is required" })
+    .string({ error: "Email is required" })
     .trim()
     .email("Invalid email address")
     .max(120, "Email cannot exceed 120 characters")
@@ -91,7 +91,7 @@ export type CustomerCreateInput = z.infer<typeof customerCreateSchema>;
 
 export const customerUpdateSchema = z.object({
   customerId: z
-    .string({ required_error: "Customer ID is required" })
+    .string({ error: "Customer ID is required" })
     .trim()
     .min(1, "Customer ID cannot be empty")
     .max(100, "Customer ID is too long"),
@@ -133,7 +133,7 @@ export const customerUpdateSchema = z.object({
     .optional()
     .or(z.literal("")),
   status: z.enum(["LEAD", "PROSPECT", "CUSTOMER", "CHURNED"], {
-    errorMap: () => ({ message: "Status must be LEAD, PROSPECT, CUSTOMER, or CHURNED" }),
+    error: "Status must be LEAD, PROSPECT, CUSTOMER, or CHURNED",
   }).optional(),
 });
 
@@ -144,16 +144,16 @@ export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>;
  */
 export const dealCreateSchema = z.object({
   title: z
-    .string({ required_error: "Deal title is required" })
+    .string({ error: "Deal title is required" })
     .trim()
     .min(1, "Title cannot be empty")
     .max(160, "Title cannot exceed 160 characters"),
   amount: z
-    .number({ required_error: "Deal amount is required" })
+    .number({ error: "Deal amount is required" })
     .min(0, "Amount cannot be negative")
     .max(100000000, "Amount exceeds maximum allowed limit"),
   stage: z.enum(["NEW_LEAD", "CONTACTED", "PROPOSAL", "WON", "LOST"], {
-    errorMap: () => ({ message: "Stage must be NEW_LEAD, CONTACTED, PROPOSAL, WON, or LOST" }),
+    error: "Stage must be NEW_LEAD, CONTACTED, PROPOSAL, WON, or LOST",
   }).default("NEW_LEAD"),
   probability: z
     .number()
@@ -181,12 +181,12 @@ export type DealCreateInput = z.infer<typeof dealCreateSchema>;
 
 export const dealUpdateStageSchema = z.object({
   dealId: z
-    .string({ required_error: "Deal ID is required" })
+    .string({ error: "Deal ID is required" })
     .trim()
     .min(1, "Deal ID cannot be empty")
     .max(100, "Deal ID is too long"),
   stage: z.enum(["NEW_LEAD", "CONTACTED", "PROPOSAL", "WON", "LOST"], {
-    errorMap: () => ({ message: "Stage must be NEW_LEAD, CONTACTED, PROPOSAL, WON, or LOST" }),
+    error: "Stage must be NEW_LEAD, CONTACTED, PROPOSAL, WON, or LOST",
   }),
 });
 
@@ -194,7 +194,7 @@ export type DealUpdateStageInput = z.infer<typeof dealUpdateStageSchema>;
 
 export const dealUpdateSchema = z.object({
   dealId: z
-    .string({ required_error: "Deal ID is required" })
+    .string({ error: "Deal ID is required" })
     .trim()
     .min(1, "Deal ID cannot be empty")
     .max(100, "Deal ID is too long"),
@@ -210,7 +210,7 @@ export const dealUpdateSchema = z.object({
     .max(100000000, "Amount exceeds maximum limit")
     .optional(),
   stage: z.enum(["NEW_LEAD", "CONTACTED", "PROPOSAL", "WON", "LOST"], {
-    errorMap: () => ({ message: "Stage must be NEW_LEAD, CONTACTED, PROPOSAL, WON, or LOST" }),
+    error: "Stage must be NEW_LEAD, CONTACTED, PROPOSAL, WON, or LOST",
   }).optional(),
   probability: z
     .number()
@@ -241,7 +241,7 @@ export type DealUpdateInput = z.infer<typeof dealUpdateSchema>;
  */
 export const taskCreateSchema = z.object({
   title: z
-    .string({ required_error: "Task title is required" })
+    .string({ error: "Task title is required" })
     .trim()
     .min(2, "Title must be at least 2 characters")
     .max(200, "Title cannot exceed 200 characters"),
@@ -252,11 +252,11 @@ export const taskCreateSchema = z.object({
     .optional()
     .or(z.literal("")),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"], {
-    errorMap: () => ({ message: "Priority must be LOW, MEDIUM, HIGH, or URGENT" }),
+    error: "Priority must be LOW, MEDIUM, HIGH, or URGENT",
   }),
   status: z
     .enum(["TODO", "IN_PROGRESS", "REVIEW", "DONE"], {
-      errorMap: () => ({ message: "Status must be TODO, IN_PROGRESS, REVIEW, or DONE" }),
+      error: "Status must be TODO, IN_PROGRESS, REVIEW, or DONE",
     })
     .optional()
     .default("TODO"),
@@ -287,11 +287,11 @@ export type TaskCreateInput = z.infer<typeof taskCreateSchema>;
 
 export const taskUpdateStatusSchema = z.object({
   taskId: z
-    .string({ required_error: "Task ID is required" })
+    .string({ error: "Task ID is required" })
     .min(1, "Task ID cannot be empty")
     .max(100, "Invalid Task ID length"),
   newStatus: z.enum(["TODO", "IN_PROGRESS", "REVIEW", "DONE"], {
-    errorMap: () => ({ message: "Status must be TODO, IN_PROGRESS, REVIEW, or DONE" }),
+    error: "Status must be TODO, IN_PROGRESS, REVIEW, or DONE",
   }),
 });
 
@@ -299,7 +299,7 @@ export type TaskUpdateStatusInput = z.infer<typeof taskUpdateStatusSchema>;
 
 export const taskDeleteSchema = z.object({
   taskId: z
-    .string({ required_error: "Task ID is required" })
+    .string({ error: "Task ID is required" })
     .min(1, "Task ID cannot be empty")
     .max(100, "Invalid Task ID length"),
 });
@@ -311,17 +311,17 @@ export type TaskDeleteInput = z.infer<typeof taskDeleteSchema>;
  */
 export const invoiceItemSchema = z.object({
   description: z
-    .string({ required_error: "Item description is required" })
+    .string({ error: "Item description is required" })
     .min(1, "Description cannot be empty")
     .max(250, "Description cannot exceed 250 characters")
     .trim(),
   quantity: z
-    .number({ required_error: "Quantity is required" })
+    .number({ error: "Quantity is required" })
     .int("Quantity must be a whole number")
     .positive("Quantity must be at least 1")
     .max(10000, "Quantity cannot exceed 10,000"),
   unitPrice: z
-    .number({ required_error: "Unit price is required" })
+    .number({ error: "Unit price is required" })
     .min(0, "Unit price cannot be negative")
     .max(10000000, "Unit price exceeds maximum allowed value"),
 });
@@ -329,10 +329,10 @@ export const invoiceItemSchema = z.object({
 export const invoiceCreateSchema = z
   .object({
     customerId: z
-      .string({ required_error: "Customer is required" })
+      .string({ error: "Customer is required" })
       .min(1, "Customer ID cannot be empty"),
     items: z
-      .array(invoiceItemSchema, { required_error: "At least one item is required" })
+      .array(invoiceItemSchema, { error: "At least one item is required" })
       .min(1, "Invoice must have at least one item")
       .max(50, "Invoice cannot have more than 50 items"),
     issueDate: z
@@ -340,7 +340,7 @@ export const invoiceCreateSchema = z
       .optional()
       .refine((val) => !val || !isNaN(Date.parse(val)), { message: "Invalid issue date format" }),
     dueDate: z
-      .string({ required_error: "Due date is required" })
+      .string({ error: "Due date is required" })
       .refine((val) => !isNaN(Date.parse(val)), { message: "Invalid due date format" }),
     notes: z
       .string()
@@ -350,7 +350,7 @@ export const invoiceCreateSchema = z
       .or(z.literal("")),
     status: z
       .enum(["DRAFT", "PENDING"], {
-        errorMap: () => ({ message: "Initial status must be DRAFT or PENDING" }),
+        error: "Initial status must be DRAFT or PENDING",
       })
       .optional()
       .default("PENDING"),
@@ -372,10 +372,10 @@ export type InvoiceCreateInput = z.infer<typeof invoiceCreateSchema>;
 
 export const invoiceStatusUpdateSchema = z.object({
   invoiceId: z
-    .string({ required_error: "Invoice ID is required" })
+    .string({ error: "Invoice ID is required" })
     .min(1, "Invoice ID cannot be empty"),
   status: z.enum(["DRAFT", "PENDING", "PAID", "OVERDUE"], {
-    errorMap: () => ({ message: "Status must be DRAFT, PENDING, PAID, or OVERDUE" }),
+    error: "Status must be DRAFT, PENDING, PAID, or OVERDUE",
   }),
 });
 
@@ -384,7 +384,7 @@ export type InvoiceStatusUpdateInput = z.infer<typeof invoiceStatusUpdateSchema>
 export const invoiceUpdateSchema = z
   .object({
     invoiceId: z
-      .string({ required_error: "Invoice ID is required" })
+      .string({ error: "Invoice ID is required" })
       .min(1, "Invoice ID cannot be empty"),
     customerId: z
       .string()
@@ -430,7 +430,7 @@ export type InvoiceUpdateInput = z.infer<typeof invoiceUpdateSchema>;
  */
 export const companySettingsSchema = z.object({
   name: z
-    .string({ required_error: "Company name is required" })
+    .string({ error: "Company name is required" })
     .min(1, "Company name cannot be empty")
     .max(120, "Company name cannot exceed 120 characters")
     .trim(),
@@ -474,7 +474,7 @@ export const companySettingsSchema = z.object({
     )
     .optional(),
   taxRate: z
-    .number({ invalid_type_error: "Tax rate must be a valid number" })
+    .number({ error: "Tax rate must be a valid number" })
     .min(0, "Tax rate cannot be negative")
     .max(100, "Tax rate cannot exceed 100%")
     .optional(),
@@ -523,10 +523,10 @@ export type CompanySettingsInput = z.infer<typeof companySettingsSchema>;
  */
 export const appointmentCreateSchema = z.object({
   customerId: z
-    .string({ required_error: "Customer is required" })
+    .string({ error: "Customer is required" })
     .min(1, "Customer ID cannot be empty"),
   serviceId: z
-    .string({ required_error: "Service is required" })
+    .string({ error: "Service is required" })
     .min(1, "Service ID cannot be empty"),
   staffId: z
     .string()
@@ -534,7 +534,7 @@ export const appointmentCreateSchema = z.object({
     .nullable()
     .or(z.literal("")),
   startTime: z
-    .string({ required_error: "Start time is required" })
+    .string({ error: "Start time is required" })
     .refine(
       (val) => !isNaN(Date.parse(val)) || /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(val),
       { message: "Invalid appointment start time format" }
@@ -554,7 +554,7 @@ export type AppointmentCreateInput = z.infer<typeof appointmentCreateSchema>;
 export const appointmentRescheduleSchema = z
   .object({
     appointmentId: z
-      .string({ required_error: "Appointment ID is required" })
+      .string({ error: "Appointment ID is required" })
       .min(1, "Appointment ID cannot be empty"),
     startTime: z
       .string()
@@ -584,10 +584,10 @@ export type AppointmentRescheduleInput = z.infer<typeof appointmentRescheduleSch
 
 export const appointmentStatusUpdateSchema = z.object({
   appointmentId: z
-    .string({ required_error: "Appointment ID is required" })
+    .string({ error: "Appointment ID is required" })
     .min(1, "Appointment ID cannot be empty"),
   status: z.enum(["CONFIRMED", "COMPLETED", "CANCELLED"], {
-    errorMap: () => ({ message: "Status must be CONFIRMED, COMPLETED, or CANCELLED" }),
+    error: "Status must be CONFIRMED, COMPLETED, or CANCELLED",
   }),
 });
 
@@ -595,7 +595,7 @@ export type AppointmentStatusUpdateInput = z.infer<typeof appointmentStatusUpdat
 
 export const serviceCreateSchema = z.object({
   title: z
-    .string({ required_error: "Service title is required" })
+    .string({ error: "Service title is required" })
     .min(1, "Service title cannot be empty")
     .max(120, "Service title cannot exceed 120 characters")
     .trim(),
@@ -606,12 +606,12 @@ export const serviceCreateSchema = z.object({
     .optional()
     .or(z.literal("")),
   durationMinutes: z
-    .number({ required_error: "Duration is required" })
+    .number({ error: "Duration is required" })
     .int("Duration must be a whole number of minutes")
     .min(15, "Minimum service duration is 15 minutes")
     .max(480, "Maximum service duration is 8 hours (480 minutes)"),
   price: z
-    .number({ required_error: "Price is required" })
+    .number({ error: "Price is required" })
     .min(0, "Price cannot be negative")
     .max(100000, "Price exceeds maximum allowable limit"),
   category: z
@@ -626,7 +626,7 @@ export type ServiceCreateInput = z.infer<typeof serviceCreateSchema>;
 
 export const serviceUpdateSchema = z.object({
   serviceId: z
-    .string({ required_error: "Service ID is required" })
+    .string({ error: "Service ID is required" })
     .min(1, "Service ID cannot be empty"),
   title: z
     .string()
@@ -667,12 +667,12 @@ export type ServiceUpdateInput = z.infer<typeof serviceUpdateSchema>;
  */
 export const productCreateSchema = z.object({
   name: z
-    .string({ required_error: "Product name is required" })
+    .string({ error: "Product name is required" })
     .trim()
     .min(2, "Product name must be at least 2 characters")
     .max(150, "Product name cannot exceed 150 characters"),
   sku: z
-    .string({ required_error: "SKU is required" })
+    .string({ error: "SKU is required" })
     .trim()
     .min(2, "SKU must be at least 2 characters")
     .max(50, "SKU cannot exceed 50 characters")
@@ -684,7 +684,7 @@ export const productCreateSchema = z.object({
     .max(50, "Category cannot exceed 50 characters")
     .default("Hardware"),
   price: z
-    .number({ required_error: "Price is required" })
+    .number({ error: "Price is required" })
     .min(0, "Price cannot be negative")
     .max(10000000, "Price exceeds maximum allowed limit"),
   cost: z
@@ -724,7 +724,7 @@ export type ProductCreateInput = z.infer<typeof productCreateSchema>;
 
 export const productUpdateSchema = z.object({
   productId: z
-    .string({ required_error: "Product ID is required" })
+    .string({ error: "Product ID is required" })
     .min(1, "Product ID cannot be empty"),
   name: z
     .string()
@@ -787,7 +787,7 @@ export type ProductUpdateInput = z.infer<typeof productUpdateSchema>;
 
 export const productDeleteSchema = z.object({
   productId: z
-    .string({ required_error: "Product ID is required" })
+    .string({ error: "Product ID is required" })
     .min(1, "Product ID cannot be empty"),
 });
 
@@ -798,17 +798,17 @@ export type ProductDeleteInput = z.infer<typeof productDeleteSchema>;
  */
 export const employeeCreateSchema = z.object({
   name: z
-    .string({ required_error: "Employee name is required" })
+    .string({ error: "Employee name is required" })
     .trim()
     .min(2, "Name must be at least 2 characters")
     .max(100, "Name cannot exceed 100 characters"),
   email: z
-    .string({ required_error: "Email is required" })
+    .string({ error: "Email is required" })
     .trim()
     .email("Invalid email format")
     .toLowerCase(),
   role: z.enum(["ADMIN", "MANAGER", "EMPLOYEE"], {
-    errorMap: () => ({ message: "Role must be ADMIN, MANAGER, or EMPLOYEE" }),
+    error: "Role must be ADMIN, MANAGER, or EMPLOYEE",
   }).default("EMPLOYEE"),
   department: z
     .string()
@@ -830,7 +830,7 @@ export const employeeCreateSchema = z.object({
     .nullable()
     .or(z.literal("")),
   status: z.enum(["ACTIVE", "ON_LEAVE", "INACTIVE"], {
-    errorMap: () => ({ message: "Status must be ACTIVE, ON_LEAVE, or INACTIVE" }),
+    error: "Status must be ACTIVE, ON_LEAVE, or INACTIVE",
   }).default("ACTIVE"),
   password: z
     .string()
@@ -842,7 +842,7 @@ export type EmployeeCreateInput = z.infer<typeof employeeCreateSchema>;
 
 export const employeeUpdateSchema = z.object({
   employeeId: z
-    .string({ required_error: "Employee ID is required" })
+    .string({ error: "Employee ID is required" })
     .min(1, "Employee ID cannot be empty"),
   name: z
     .string()
@@ -851,7 +851,7 @@ export const employeeUpdateSchema = z.object({
     .max(100, "Name cannot exceed 100 characters")
     .optional(),
   role: z.enum(["ADMIN", "MANAGER", "EMPLOYEE"], {
-    errorMap: () => ({ message: "Role must be ADMIN, MANAGER, or EMPLOYEE" }),
+    error: "Role must be ADMIN, MANAGER, or EMPLOYEE",
   }).optional(),
   department: z
     .string()
@@ -871,7 +871,7 @@ export const employeeUpdateSchema = z.object({
     .nullable()
     .or(z.literal("")),
   status: z.enum(["ACTIVE", "ON_LEAVE", "INACTIVE"], {
-    errorMap: () => ({ message: "Status must be ACTIVE, ON_LEAVE, or INACTIVE" }),
+    error: "Status must be ACTIVE, ON_LEAVE, or INACTIVE",
   }).optional(),
 });
 
@@ -882,15 +882,15 @@ export type EmployeeUpdateInput = z.infer<typeof employeeUpdateSchema>;
  */
 export const financeRecordCreateSchema = z.object({
   type: z.enum(["REVENUE", "EXPENSE"], {
-    errorMap: () => ({ message: "Type must be REVENUE or EXPENSE" }),
+    error: "Type must be REVENUE or EXPENSE",
   }),
   category: z
-    .string({ required_error: "Category is required" })
+    .string({ error: "Category is required" })
     .trim()
     .min(1, "Category cannot be empty")
     .max(100, "Category cannot exceed 100 characters"),
   amount: z
-    .number({ required_error: "Amount is required" })
+    .number({ error: "Amount is required" })
     .positive("Amount must be greater than 0")
     .max(100000000, "Amount exceeds maximum limit"),
   date: z
@@ -902,12 +902,12 @@ export const financeRecordCreateSchema = z.object({
       message: "Invalid transaction date format",
     }),
   description: z
-    .string({ required_error: "Description is required" })
+    .string({ error: "Description is required" })
     .trim()
     .min(1, "Description cannot be empty")
     .max(500, "Description cannot exceed 500 characters"),
   status: z.enum(["SETTLED", "PENDING"], {
-    errorMap: () => ({ message: "Status must be SETTLED or PENDING" }),
+    error: "Status must be SETTLED or PENDING",
   }).default("SETTLED"),
 });
 
@@ -915,7 +915,7 @@ export type FinanceRecordCreateInput = z.infer<typeof financeRecordCreateSchema>
 
 export const financeRecordUpdateSchema = z.object({
   recordId: z
-    .string({ required_error: "Record ID is required" })
+    .string({ error: "Record ID is required" })
     .min(1, "Record ID cannot be empty"),
   type: z.enum(["REVENUE", "EXPENSE"]).optional(),
   category: z
@@ -950,7 +950,7 @@ export type FinanceRecordUpdateInput = z.infer<typeof financeRecordUpdateSchema>
 
 export const financeRecordDeleteSchema = z.object({
   recordId: z
-    .string({ required_error: "Record ID is required" })
+    .string({ error: "Record ID is required" })
     .min(1, "Record ID cannot be empty"),
 });
 
@@ -961,12 +961,12 @@ export type FinanceRecordDeleteInput = z.infer<typeof financeRecordDeleteSchema>
  */
 export const documentCreateSchema = z.object({
   name: z
-    .string({ required_error: "Document name is required" })
+    .string({ error: "Document name is required" })
     .trim()
     .min(2, "Document name must be at least 2 characters")
     .max(150, "Document name cannot exceed 150 characters"),
   category: z
-    .string({ required_error: "Category is required" })
+    .string({ error: "Category is required" })
     .trim()
     .min(1, "Category cannot be empty")
     .max(50, "Category cannot exceed 50 characters")
@@ -1002,7 +1002,7 @@ export type DocumentCreateInput = z.infer<typeof documentCreateSchema>;
 
 export const documentUpdateSchema = z.object({
   documentId: z
-    .string({ required_error: "Document ID is required" })
+    .string({ error: "Document ID is required" })
     .min(1, "Document ID cannot be empty"),
   name: z
     .string()
@@ -1027,7 +1027,7 @@ export type DocumentUpdateInput = z.infer<typeof documentUpdateSchema>;
 
 export const documentDeleteSchema = z.object({
   documentId: z
-    .string({ required_error: "Document ID is required" })
+    .string({ error: "Document ID is required" })
     .min(1, "Document ID cannot be empty"),
 });
 

@@ -6,6 +6,7 @@ import {
 } from "../src/lib/auth";
 import {
   companySettingsSchema,
+  invoiceCreateSchema,
 } from "../src/lib/validations";
 import { formatCurrency, roundMoney } from "../src/lib/utils";
 import { formatAppointmentTime } from "../src/lib/timezone";
@@ -502,6 +503,19 @@ async function runOperationsSecurityTests() {
   await prisma.customer.delete({ where: { id: testCustomer.id } });
   await prisma.activityLog.deleteMany({ where: { companyId: { in: [testCompanyAcme.id, testCompanyApex.id, emptyCompany.id] } } });
   await prisma.company.deleteMany({ where: { id: { in: [testCompanyAcme.id, testCompanyApex.id, emptyCompany.id] } } });
+
+  // G) Oversized constrained collection rejection (GHSA-mrhx-c7xc-m3w5 regression)
+  const oversizedItems = Array.from({ length: 1000 }, (_, i) => ({
+    description: `Item ${i}`,
+    quantity: 1,
+    unitPrice: 10,
+  }));
+  const oversizedInvoice = invoiceCreateSchema.safeParse({
+    customerId: "cust-test",
+    items: oversizedItems,
+    dueDate: "2026-12-31",
+  });
+  assert(!oversizedInvoice.success, "Oversized invoice items array (>50) is safely rejected");
 
   console.log("\n========================================");
   console.log(`Test Results: ${passed} Passed, ${failed} Failed`);
